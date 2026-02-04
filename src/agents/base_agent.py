@@ -492,6 +492,4 @@ class AgentOrchestrator:
         health_results = {}
         
         for agent_type, agent in self.agents.items():
-            health_results[agent_type] = await agent.health_check()
-        
-        return health_results
+            health_results[agent_ty
