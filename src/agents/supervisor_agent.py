@@ -93,5 +93,19 @@ class SupervisorEvaluation:
 
 
 class SupervisorAgent(BaseAgent):
-    ""
+    """
+    The Supervisor Agent is ORBIT's AI safety and quality guardian responsible for:
+    1. Real-time intervention evaluation across 5 dimensions
+    2. Risk assessment and safety checks
+    3. Quality control and accuracy verification
+    4. Success probability prediction
+    5. User experience optimization
+    """
+    
+    def __init__(self, **kwargs):
+        super().__init__(agent_type="supervisor", **kwargs)
+        
+        # Evaluation thresholds
+        self.safety_threshold = settings.MIN_SUPERVISOR_SAFETY_SCORE
+        self.relevance_thresh
                 
