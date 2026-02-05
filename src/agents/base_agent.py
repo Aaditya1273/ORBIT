@@ -12,7 +12,7 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 import uuid
 
-from langchain.schema import BaseMessage, HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 import opik
