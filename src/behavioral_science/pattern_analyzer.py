@@ -1,15 +1,17 @@
 """
 ORBIT Pattern Analyzer
-Advanced behavioral pattern analysis and failure prediction
+Advanced behavioral pattern analysis for personalized interventions
 """
 
-import json
-import statistics
-from typing import Dict, Any, List, Optional, Tuple
+import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
-from collections import defaultdict, Counter
-
+from collections import defaultdict
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -18,733 +20,795 @@ logger = structlog.get_logger(__name__)
 @dataclass
 class BehavioralPattern:
     """Identified behavioral pattern"""
-    pattern_type: str
-    confidence: float
+    pattern_type: str  # temporal, compliance, energy, failure, success
     description: str
-    frequency: int
-    last_occurrence: datetime
-    impact_score: float  # -1.0 to 1.0 (negative = harmful, positive = helpful)
-    recommendations: List[str]
+    confidence: float  # 0.0 to 1.0
+    frequency: float  # How often this pattern occurs
+    impact_score: float  # Impact on goal achievement
+    supporting_data: Dict[str, Any]
+    actionable_insights: List[str]
 
 
 @dataclass
-class GoalInteraction:
-    """Cross-domain goal interaction analysis"""
-    source_domain: str
-    target_domain: str
-    interaction_type: str  # "synergistic", "competing", "neutral"
-    impact_score: float  # -1.0 to 1.0
-    effect_type: str  # "positive", "negative", "neutral"
-    recommendation: str
-    evidence: List[str]
+class UserInsight:
+    """Actionable insight about user behavior"""
+    insight_type: str  # optimization, warning, opportunity
+    title: str
+    description: str
+    confidence: float
+    potential_impact: float
+    recommended_actions: List[str]
+    supporting_patterns: List[BehavioralPattern]
 
 
 class PatternAnalyzer:
     """
-    Advanced behavioral pattern analysis engine for ORBIT
+    Advanced pattern analysis engine that identifies behavioral patterns
+    and generates actionable insights for intervention optimization
     """
     
     def __init__(self):
         self.pattern_cache = {}
-        self.interaction_cache = {}
-        
-        # Pattern recognition thresholds
-        self.min_pattern_occurrences = 3
-        self.pattern_confidence_threshold = 0.6
-        self.interaction_significance_threshold = 0.4
+        self.insight_cache = {}
         
         logger.info("Pattern Analyzer initialized")
     
     async def analyze_user_patterns(
         self,
         user_id: str,
-        history: List[Dict[str, Any]],
+        interventions: List[Dict[str, Any]],
         goals: List[Dict[str, Any]],
-        user_state: Dict[str, Any]
+        context_history: List[Dict[str, Any]],
+        time_window_days: int = 30
     ) -> Dict[str, Any]:
         """
         Comprehensive analysis of user behavioral patterns
         """
-        try:
-            # Analyze different types of patterns
-            temporal_patterns = self._analyze_temporal_patterns(history)
-            compliance_patterns = self._analyze_compliance_patterns(history)
-            energy_patterns = self._analyze_energy_patterns(history, user_state)
-            context_patterns = self._analyze_context_patterns(history)
-            goal_patterns = self._analyze_goal_patterns(goals, history)
-            
-            # Calculate overall pattern confidence
-            pattern_confidence = self._calculate_pattern_confidence([
-                temporal_patterns, compliance_patterns, energy_patterns,
-                context_patterns, goal_patterns
-            ])
-            
-            # Generate insights and recommendations
-            insights = self._generate_pattern_insights(
-                temporal_patterns, compliance_patterns, energy_patterns,
-                context_patterns, goal_patterns
-            )
-            
-            patterns = {
-                "user_id": user_id,
-                "analysis_timestamp": datetime.utcnow().isoformat(),
-                "confidence": pattern_confidence,
-                "temporal_patterns": temporal_patterns,
-                "compliance_patterns": compliance_patterns,
-                "energy_patterns": energy_patterns,
-                "context_patterns": context_patterns,
-                "goal_patterns": goal_patterns,
-                "insights": insights,
-                "recommendations": self._generate_pattern_recommendations(insights)
-            }
-            
-            # Cache results
-            self.pattern_cache[user_id] = {
-                "patterns": patterns,
-                "timestamp": datetime.utcnow()
-            }
-            
-            logger.info(
-                "User patterns analyzed",
-                user_id=user_id,
-                confidence=pattern_confidence,
-                insights_count=len(insights)
-            )
-            
-            return patterns
-            
-        except Exception as e:
-            logger.error(f"Pattern analysis failed for user {user_id}: {str(e)}")
-            return self._get_default_patterns(user_id)
-    
-    def _analyze_temporal_patterns(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze time-based behavioral patterns"""
-        if not history:
-            return {"confidence": 0.0, "patterns": []}
-        
-        # Group activities by time of day
-        hourly_activity = defaultdict(list)
-        daily_activity = defaultdict(list)
-        weekly_activity = defaultdict(list)
-        
-        for event in history:
-            if "timestamp" in event:
-                try:
-                    timestamp = datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
-                    hour = timestamp.hour
-                    day = timestamp.strftime("%A")
-                    week = timestamp.isocalendar()[1]
-                    
-                    activity_type = event.get("action", "unknown")
-                    
-                    hourly_activity[hour].append(activity_type)
-                    daily_activity[day].append(activity_type)
-                    weekly_activity[week].append(activity_type)
-                except:
-                    continue
-        
-        patterns = []
-        
-        # Find peak activity hours
-        if hourly_activity:
-            peak_hours = sorted(hourly_activity.keys(), key=lambda h: len(hourly_activity[h]), reverse=True)[:3]
-            patterns.append({
-                "type": "peak_activity_hours",
-                "data": peak_hours,
-                "confidence": min(1.0, len(history) / 50),  # More data = higher confidence
-                "description": f"Most active during hours: {', '.join(map(str, peak_hours))}"
-            })
-        
-        # Find preferred days
-        if daily_activity:
-            preferred_days = sorted(daily_activity.keys(), key=lambda d: len(daily_activity[d]), reverse=True)[:3]
-            patterns.append({
-                "type": "preferred_days",
-                "data": preferred_days,
-                "confidence": min(1.0, len(set(daily_activity.keys())) / 7),
-                "description": f"Most active on: {', '.join(preferred_days)}"
-            })
-        
-        return {
-            "confidence": self._calculate_temporal_confidence(patterns),
-            "patterns": patterns,
-            "hourly_distribution": dict(hourly_activity),
-            "daily_distribution": dict(daily_activity)
-        }
-    
-    def _analyze_compliance_patterns(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze compliance and success patterns"""
-        if not history:
-            return {"confidence": 0.0, "average_compliance_rate": 0.5}
-        
-        # Extract compliance events
-        compliance_events = []
-        for event in history:
-            if event.get("type") == "intervention_response":
-                compliance_events.append({
-                    "timestamp": event.get("timestamp"),
-                    "complied": event.get("complied", False),
-                    "intervention_type": event.get("intervention_type", "unknown"),
-                    "domain": event.get("domain", "unknown")
-                })
-        
-        if not compliance_events:
-            return {"confidence": 0.0, "average_compliance_rate": 0.5}
-        
-        # Calculate overall compliance rate
-        total_complied = sum(1 for event in compliance_events if event["complied"])
-        compliance_rate = total_complied / len(compliance_events)
-        
-        # Analyze compliance by domain
-        domain_compliance = defaultdict(list)
-        for event in compliance_events:
-            domain_compliance[event["domain"]].append(event["complied"])
-        
-        domain_rates = {}
-        for domain, compliances in domain_compliance.items():
-            domain_rates[domain] = sum(compliances) / len(compliances)
-        
-        # Analyze compliance by intervention type
-        type_compliance = defaultdict(list)
-        for event in compliance_events:
-            type_compliance[event["intervention_type"]].append(event["complied"])
-        
-        type_rates = {}
-        for int_type, compliances in type_compliance.items():
-            type_rates[int_type] = sum(compliances) / len(compliances)
-        
-        # Find patterns in compliance timing
-        compliance_trends = self._analyze_compliance_trends(compliance_events)
-        
-        return {
-            "confidence": min(1.0, len(compliance_events) / 20),
-            "average_compliance_rate": compliance_rate,
-            "domain_compliance_rates": domain_rates,
-            "intervention_type_rates": type_rates,
-            "trends": compliance_trends,
-            "total_interventions": len(compliance_events),
-            "successful_interventions": total_complied
-        }
-    
-    def _analyze_energy_patterns(
-        self,
-        history: List[Dict[str, Any]],
-        user_state: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Analyze energy level patterns and optimal timing"""
-        energy_data = []
-        
-        # Extract energy-related events from history
-        for event in history:
-            if "energy_level" in event:
-                energy_data.append({
-                    "timestamp": event.get("timestamp"),
-                    "energy_level": event["energy_level"],
-                    "activity": event.get("action", "unknown")
-                })
-        
-        # Include current energy state
-        current_energy = user_state.get("energy_level")
-        if current_energy:
-            energy_data.append({
-                "timestamp": datetime.utcnow().isoformat(),
-                "energy_level": current_energy,
-                "activity": "current_state"
-            })
-        
-        if not energy_data:
-            return {"confidence": 0.0, "patterns": []}
-        
-        # Analyze energy by time of day
-        hourly_energy = defaultdict(list)
-        for data in energy_data:
-            try:
-                timestamp = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
-                hour = timestamp.hour
-                hourly_energy[hour].append(data["energy_level"])
-            except:
-                continue
-        
-        # Calculate average energy by hour
-        hourly_averages = {}
-        for hour, energies in hourly_energy.items():
-            if isinstance(energies[0], (int, float)):
-                hourly_averages[hour] = statistics.mean(energies)
-            else:
-                # Handle string energy levels
-                energy_map = {"low": 1, "medium": 2, "high": 3}
-                numeric_energies = [energy_map.get(e.lower(), 2) for e in energies]
-                hourly_averages[hour] = statistics.mean(numeric_energies)
-        
-        # Find peak energy hours
-        peak_hours = []
-        if hourly_averages:
-            max_energy = max(hourly_averages.values())
-            peak_hours = [hour for hour, energy in hourly_averages.items() if energy >= max_energy * 0.9]
-        
-        patterns = []
-        if peak_hours:
-            patterns.append({
-                "type": "peak_energy_hours",
-                "data": sorted(peak_hours),
-                "confidence": min(1.0, len(energy_data) / 10),
-                "description": f"Highest energy during hours: {', '.join(map(str, sorted(peak_hours)))}"
-            })
-        
-        return {
-            "confidence": min(1.0, len(energy_data) / 10),
-            "patterns": patterns,
-            "hourly_averages": hourly_averages,
-            "peak_energy_hours": sorted(peak_hours) if peak_hours else [],
-            "current_energy": current_energy
-        }
-    
-    def _analyze_context_patterns(self, history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze contextual patterns (location, weather, social, etc.)"""
-        context_data = defaultdict(list)
-        
-        for event in history:
-            context = event.get("context", {})
-            for key, value in context.items():
-                if value:  # Only include non-empty values
-                    context_data[key].append({
-                        "value": value,
-                        "success": event.get("success", False),
-                        "timestamp": event.get("timestamp")
-                    })
-        
-        patterns = []
-        
-        # Analyze each context dimension
-        for context_type, data in context_data.items():
-            if len(data) >= self.min_pattern_occurrences:
-                # Find most common values
-                value_counts = Counter(item["value"] for item in data)
-                most_common = value_counts.most_common(3)
-                
-                # Calculate success rates by context value
-                success_rates = defaultdict(list)
-                for item in data:
-                    success_rates[item["value"]].append(item["success"])
-                
-                context_success_rates = {}
-                for value, successes in success_rates.items():
-                    context_success_rates[value] = sum(successes) / len(successes)
-                
-                patterns.append({
-                    "type": f"{context_type}_pattern",
-                    "most_common_values": most_common,
-                    "success_rates": context_success_rates,
-                    "confidence": min(1.0, len(data) / 10),
-                    "description": f"Context pattern for {context_type}"
-                })
-        
-        return {
-            "confidence": min(1.0, len(patterns) / 5) if patterns else 0.0,
-            "patterns": patterns,
-            "context_dimensions": list(context_data.keys())
-        }
-    
-    def _analyze_goal_patterns(
-        self,
-        goals: List[Dict[str, Any]],
-        history: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Analyze goal-related patterns and preferences"""
-        if not goals:
-            return {"confidence": 0.0, "patterns": []}
-        
-        # Analyze goal domains
-        domains = [goal.get("domain", "unknown") for goal in goals]
-        domain_counts = Counter(domains)
-        
-        # Analyze goal progress patterns
-        progress_data = []
-        for goal in goals:
-            if "progress" in goal:
-                progress_data.append({
-                    "domain": goal.get("domain", "unknown"),
-                    "progress": goal["progress"],
-                    "created_date": goal.get("created_date"),
-                    "target_date": goal.get("target_date")
-                })
-        
-        # Calculate average progress by domain
-        domain_progress = defaultdict(list)
-        for data in progress_data:
-            domain_progress[data["domain"]].append(data["progress"])
-        
-        domain_avg_progress = {}
-        for domain, progresses in domain_progress.items():
-            domain_avg_progress[domain] = statistics.mean(progresses)
-        
-        patterns = []
-        
-        # Domain preference pattern
-        if domain_counts:
-            preferred_domains = [domain for domain, count in domain_counts.most_common(3)]
-            patterns.append({
-                "type": "domain_preferences",
-                "data": preferred_domains,
-                "confidence": min(1.0, len(goals) / 5),
-                "description": f"Preferred goal domains: {', '.join(preferred_domains)}"
-            })
-        
-        # Progress pattern
-        if domain_avg_progress:
-            best_performing_domains = sorted(
-                domain_avg_progress.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )[:3]
-            
-            patterns.append({
-                "type": "progress_performance",
-                "data": best_performing_domains,
-                "confidence": min(1.0, len(progress_data) / 5),
-                "description": f"Best performing domains: {', '.join([d[0] for d in best_performing_domains])}"
-            })
-        
-        return {
-            "confidence": min(1.0, len(patterns) / 2) if patterns else 0.0,
-            "patterns": patterns,
-            "domain_distribution": dict(domain_counts),
-            "domain_avg_progress": domain_avg_progress,
-            "total_goals": len(goals),
-            "active_goals": len([g for g in goals if g.get("status") == "active"])
-        }
-    
-    def _calculate_pattern_confidence(self, pattern_groups: List[Dict[str, Any]]) -> float:
-        """Calculate overall confidence in pattern analysis"""
-        confidences = [group.get("confidence", 0.0) for group in pattern_groups]
-        if not confidences:
-            return 0.0
-        
-        # Weighted average with more weight on compliance and temporal patterns
-        weights = [0.3, 0.3, 0.2, 0.1, 0.1]  # temporal, compliance, energy, context, goal
-        weighted_sum = sum(conf * weight for conf, weight in zip(confidences, weights))
-        
-        return min(1.0, weighted_sum)
-    
-    def _calculate_temporal_confidence(self, patterns: List[Dict[str, Any]]) -> float:
-        """Calculate confidence in temporal patterns"""
-        if not patterns:
-            return 0.0
-        
-        avg_confidence = statistics.mean(pattern.get("confidence", 0.0) for pattern in patterns)
-        return avg_confidence
-    
-    def _analyze_compliance_trends(self, compliance_events: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze trends in compliance over time"""
-        if len(compliance_events) < 5:
-            return {"trend": "insufficient_data"}
-        
-        # Sort by timestamp
-        sorted_events = sorted(
-            compliance_events,
-            key=lambda x: x.get("timestamp", "")
+        logger.info(
+            "Starting pattern analysis",
+            user_id=user_id,
+            interventions_count=len(interventions),
+            goals_count=len(goals),
+            time_window_days=time_window_days
         )
         
-        # Calculate rolling compliance rate
-        window_size = min(5, len(sorted_events) // 2)
-        rolling_rates = []
+        # Convert data to analysis format
+        df_interventions = self._prepare_intervention_data(interventions)
+        df_goals = self._prepare_goal_data(goals)
+        df_context = self._prepare_context_data(context_history)
         
-        for i in range(len(sorted_events) - window_size + 1):
-            window = sorted_events[i:i + window_size]
-            rate = sum(1 for event in window if event["complied"]) / len(window)
-            rolling_rates.append(rate)
+        # Analyze different pattern types
+        patterns = []
         
-        if len(rolling_rates) < 2:
-            return {"trend": "insufficient_data"}
+        # 1. Temporal patterns
+        temporal_patterns = await self._analyze_temporal_patterns(df_interventions, df_context)
+        patterns.extend(temporal_patterns)
         
-        # Determine trend
-        first_half = rolling_rates[:len(rolling_rates)//2]
-        second_half = rolling_rates[len(rolling_rates)//2:]
+        # 2. Compliance patterns
+        compliance_patterns = await self._analyze_compliance_patterns(df_interventions, df_goals)
+        patterns.extend(compliance_patterns)
         
-        first_avg = statistics.mean(first_half)
-        second_avg = statistics.mean(second_half)
+        # 3. Energy and mood patterns
+        energy_patterns = await self._analyze_energy_patterns(df_interventions, df_context)
+        patterns.extend(energy_patterns)
         
-        if second_avg > first_avg + 0.1:
-            trend = "improving"
-        elif second_avg < first_avg - 0.1:
-            trend = "declining"
-        else:
-            trend = "stable"
+        # 4. Success and failure patterns
+        success_patterns = await self._analyze_success_failure_patterns(df_interventions, df_goals)
+        patterns.extend(success_patterns)
         
-        return {
-            "trend": trend,
-            "first_half_avg": first_avg,
-            "second_half_avg": second_avg,
-            "change": second_avg - first_avg,
-            "rolling_rates": rolling_rates
+        # 5. Cross-domain patterns
+        crosn_patterns(df_interventions, df_goals)
+        patterns.extend(cross_domain_patterns)
+        
+        # Generate actionable insights
+        insights = await self._generate_insights(patterns, user_id)
+        
+        # Calculate overall behavioral profile
+        behavioral_profile = await self._create_behavioral_profile(patterns, insights)
+        
+        analysis_result = {
+            "user_id": user_id,
+            "analysis_timestamp": datetime.utcnow().isoformat(),
+            "ndow_days,
+            "patterns": [pattern.__dict__ for pattern in patterns],
+            "insights": [insight.__dict__ for insight in insights],
+            "behavioral_profile": behavioral_profile,
+            "recommendations": await self._generate_recommendations(insights),
+            "confidence_score": np.mean([pattern.confidence for pattern in patterns]) if patterns else 0.5
         }
+        
+        # Cache results
+        self.pattern_cache[user_id] = analysis_result
+        
+        logger.info(
+            "Pattern analysis completed",
+            user_id=user_id,
+            patterns_found=len(patterns),
+            insights_generated=len(insights),
+            confidence_score=analysis_result["confidence_score"]
+        )
+        
+        return analysis_result
     
-    def _generate_pattern_insights(self, *pattern_groups) -> List[Dict[str, Any]]:
-        """Generate actionable insights from pattern analysis"""
+    async def _analyze_temporal_patterns(
+        self,
+        df_interventions: pd.DataFrame,
+        df_context: pd.DataFrame
+    ) -> List[BehavioralPattern]:
+        """
+        Analyze temporal patterns in user behavior
+        """
+        patterns = []
+        
+        if df_interventions.empty:
+            return patterns
+        
+        # Hour of day patterns
+        hourly_compliance = df_interventions.groupby('hour')['complied'].mean()
+        
+        # Find peak performance hours
+        if len(hourly_compliance) > 0:
+            peak_hours = hourly_compliance.nlargest(3).index.tolist()
+            low_hours = hourly_compliance.nsmallest(3).index.tolist()
+            
+            if hourly_compliance.max() - hourly_compliance.min() > 0.2:  # Significant difference
+                patterns.append(BehavioralPattern(
+                    pattern_type="temporal",
+                    description=f"Peak performance hours: {peak_hours}, Low performance: {low_hours}",
+                    confidence=0.8,
+                    frequency=1.0,  # Daily pattern
+                    impact_score=0.7,
+                    supporting_data={
+                        "peak_hours": peak_hours,
+                        "low_hours": low_hours,
+                        "hourly_compliance": hourly_compliance.to_dict()
+                    },
+                    actionable_insights=[
+                        f"Schedule important interventions during {peak_hours}",
+                        f"Avoid or modify interventions during {low_hours}",
+                        "Use time-based intervention scheduling"
+                    ]
+                ))
+        
+        # Day of week patterns
+        if 'day_of_week' in df_interventions.columns:
+            weekly_compliance = df_interventions.groupby('day_of_week')['complied'].mean()
+            
+            if len(weekly_compliance) > 0:
+                best_days = weekly_compliance.nlargest(2).index.tolist()
+                worst_days = weekly_compliance.nsmallest(2).index.tolist()
+                
+                if weekly_compliance.max() - weekly_compliance.min() > 0.15:
+                    patterns.append(BehavioralPattern(
+                        pattern_type="temporal",
+                        description=f"Bestng days: {worst_days}",
+                        confidence=0.7,
+                        frequency=1.0,  # Weekly pattern
+                        impact_score=0.6,
+                        supporting_data={
+                            "best_days": best_days,
+                            "worst_days": worst_days,
+                            "weekly_compliance": weekly_compliance.to_dict()
+                        },
+                        actionable_insights=[
+                            f"Focus on builtum on {best_days}",
+                            f"Provide extra support on {worst_days}",
+                            "Adjust intervention frequency based on day of week"
+                        ]
+                    ))
+        
+        return patterns
+    
+    async def _analyze_compliance_patterns(
+        self,
+        df_interventions: pd.DataFrame,
+        df_goals: pd.DataFrame
+    ) -> List[BehavioralPattern]:
+        """
+        Analyze compliance patterns across different dimensions
+        """
+        patterns = []
+        
+        if df_interventions.empty:
+            return patterns
+        
+        # Domain-specific compliance
+        if 'domain' in df_interventions.columns:
+            domain_compliance = df_interventions.groupby('domain')['complied'].agg(['mean', 'count'])
+            domain_compliance = domain_compliance[domain_compliance['count'] >= 3]  # Minimum sample size
+            
+            if not domain_compliance.empty:
+                best_domain = domain_compliance['mean']()
+                worst_domain = domain_compliance['mean'].idxmin()
+                
+                if domain_compliance['mean'].max() - domain_compliance['mean'].min() > 0.2:
+                    patterns.append(BehavioralPattern(
+                        pattern_type="compliance",
+                        description=f"Highest compliance in {best_domain} ({domain_compliance.loc[best_domain, 'mean']:.1%}), lowest in {worst_domain} ({domain_compliance.loc[worst_domain, 'mean']:.1%})",
+    onfidence=0.8,
+                        frequency=0.8,
+                        impact_score=0.8,
+                        supporting_data={
+                            "domain_compliance": domain_compliance.to_dict(),
+                            "best_domain": best_domain,
+                            "worst_domain": worst_domain
+                        },
+                        actionable_insights=[
+                            f"Leverage success strategies from {best_domain} for other domains",
+                            f"Investigate barriers in {worst_domain}",
+                            "Consider domain-specific intervention approaches"
+                        ]
+                    ))
+        
+        # Intervention type compliance
+        if 'intervention_type' in df_interventions.columns:
+            type_compliance = df_interventions.groupby('intervention_type')['complied'].agg(['mean', 'count'])
+            type_compliance = type_compliance[type_compliance['count'] >= 3]
+            
+            if not type_copliance.empty:
+                best_type = type_compliance['mean'].idxmax()
+                worst_type = type_compliance['mean'].idxmin()
+                
+                patterns.append(BehavioralPattern(
+                    pattern_type="compliance",
+                    description=f"Most effective intervention type: {best_type}, least effective: {worst_type}",
+                    confidence=0.7,
+                    frequency=0.6,
+                    impact_score=0.7,
+                    supporting_data={
+                        "type_compliance": type_compliance.to_dict(),
+                        "best_type": best_type,
+                        "worst_type": worst_type
+                    },
+                    actionable_insights=[
+                        f"Increase use of {best_type} interventions",
+                        f"Modify or reduce {worst_type} interventions",
+                        "Personalize intervention types based on effectiveness"
+                    ]
+                ))
+        
+        return patterns
+    
+    async def _analyze_energy_patterns(
+        self,
+        df_interventions: pd.DataFrame,
+        df_context: pd.DataFrame
+    ) -> List[BehavioralPattern]:
+        """
+        Analyze energy and mood patterns
+        """
+        patterns = []
+        
+        # This would analyze energy levels, stress indicators, etc.
+        # For now, create a sample pattern
+        if not df_interventions.empty:
+            # Analyze compliance vs time since last intervention
+            df_intervens['hours_since_last'] = df_interventions['timestamp'].diff().dt.total_seconds() / 3600
+            
+            # Find optimal intervention frequency
+            if 'hours_since_last' in df_interventions.columns:
+                # Group by intervention frequency and analyze compliance
+                df_interventions['frequency_bucket'] = pd.cut(
+                    df_interventions['hours_since_last'].fillna(24), 
+                    bins=[0, 2, 6, 12, 24, 48, float('inf')],
+                h', '2-6h', '6-12h', '12-24h', '24-48h', '>48h']
+                )
+                
+                frequency_compliance = df_interventions.groupby('frequency_bucket')['complied'].mean()
+                
+                if len(frequency_compliance) > 0:
+                    optimal_frequency = frequency_compliance.idxmax()
+                    
+                    patterns.append(BehavioralPattern(
+                        pattern_type="energy",
+                        description=f"Op{optimal_frequency}",
+                        confidence=0.6,
+                        frequency=0.7,
+                        impact_score=0.5,
+                        supporting_data={
+                            "frequency_compliance": frequency_compliance.to_dict(),
+                            "optimal_frequency": optimal_frequency
+                        },
+                        actionable_insights=[
+                            f"Space interventions approximately {optimal_frequency} apart",
+                            "Avoid intervention fatigue with appropriate timing",
+                            "Monitor user energy levels for optimal timing"
+                        ]
+                    ))
+        
+        return patterns
+    
+    async def _analyze_success_failure_patterns(
+        self,
+        df_interventions: pd.DataFrame,
+        df_goals: pd.DataFrame
+    ) -> List[BehavioralPattern]:
+        """
+        Analyze patterns in success and failure
+        """
+        patterns = []
+        
+        if df_interventions.empty:
+            return patterns
+        
+        # Analyze streaks
+        df_interventions = df_interventions.sort_values('timestamp')
+        df_interventions['compliance_streak'] = (
+            df_interventions['complied'] != df_interventions['complied'].shift()
+        ).cumsum()
+        
+        # Calculate streak lengths
+        streak_lengths = df_interventions.groupby(['compliance_streak', 'complied']).size()
+        
+        if len(streak_lengths) > 0:
+            success_streaks = strlengths[streak_lengths.index.get_level_values(1) == True]
+            failure_streaks = streak_lengths[streak_lengths.index.get_level_values(1) == False]
+            
+            if len(success_streaks) > 0:
+                avg_success_streak = success_streaks.mean()
+                max_success_streak = success_streaks.max()
+                
+                patterns.append(BehavioralPattern(
+                    pattern_type="success",
+                    description=f"Average success streak: {k:.1f}, Maximum: {max_success_streak}",
+                    confidence=0.7,
+                    frequency=0.5,
+                    impact_score=0.8,
+                    supporting_data={
+                        "avg_success_streak": avg_success_streak,
+                        "max_success_streak": max_success_streak,
+                        "success_streaks": success_streaks.tolist()
+                    },
+                    actionable_insights=[
+                        "Celebrate and reinforce success streaks",
+                        "Identify factors that contribute to longer streaks",
+                        "Use streak momentum for challenging goals"
+                    ]
+                ))
+            
+            if len(failure_streaks) > 0:
+                avg_failure_streak = failure_streaks.mean()
+                
+                if avg_failure_streak > 2:  # Concerning pattern
+                    patterns.append(BehavioralPattern(
+                        pattern_type="failure",
+                        description=f"Average failure streak: {avg_failure_streak:.1f} - needs intervention",
+                        confidence=0.8,
+                        frequency=0.4,
+                        impact_score=0.9,
+                        supporting_data={
+                            "avg_failure_streak": avg_failure_streak,
+                            "failure_streaks": failure_streaks.tolist()
+                        },
+                        actionable_insights=[
+                          strategies",
+                            "Reduce intervention difficulty during failure streaks",
+                            "Provide additional support and motivation"
+                        ]
+                    ))
+        
+        return patterns
+    
+    async def _analyze_cross_domain_patterns(
+        self,
+        df_interventions: pd.DataFrame,
+        df_goals: pd.DataFrame
+    ) -> List[BehavioralPattern]:
+        """
+        Analyze patterns across different goal domains
+        """
+        patterns = []
+        
+        if df_interventions.empty or 'domain' not in df_interventions.columns:
+            return patterns
+        
+        # Analyze domain interaction effects
+        domains = df_interventions['domain'].unique()
+        
+        if len(domains) > 1:
+            # Calculate correlation between domain compliance rates
+            domain_daily_compliance = df_interventions.groupby(['date', 'domain'])['complied'].mean().unstack(fill_value=0)
+            
+            if len(domain_daily_compliance) > 5:  # Need sufficient data
+                correlation_matrix = domain_daily_compliance.corr()
+                
+                # Find strong correlations
+                strong_correlations = []
+                for i in range(len(correlation_matrix.columns)):
+                    for j in range(i+1, len(correlation_matrix.columns)):
+                        corr = correlation_matrix.iloc[i, j]
+                        if abs(corr) > 0.5:  # Strong correlation
+                      tion_matrix.columns[i]
+                            domain2 = correlation_matrix.columns[j]
+                            strong_correlations.append((domain1, domain2, corr))
+                
+                if strong_correlations:
+                    for domain1, domain2, corr in strong_correlations:
+                        correlation_type = "positive" if corr > 0 else "negative"
+                        
+                        patterns.append(BehavioralPattern(
+                            pattern_type="cross_domain",
+                            description=f"{correlation_type.title()} correlation between {domain1} and {domain2} ({corr:.2f})",
+                            confidence=0.6,
+                            frequency=0.8,
+                            impact_score=0.6,
+                            supporting_data={
+                                "domain1": domain1,
+                                "domain2": domain2,
+                                "correlation": corr,
+                                "corretype": correlation_type
+                            },
+                            actionable_insights=[
+                                f"Success in {domain1} {'supports' if corr > 0 else 'may interfere with'} {domain2}",
+                                "Consider cross-domain intervention strategies",
+                                "Optimize goal scheduling based on domain interactions"
+                            ]
+                        ))
+        
+        return patterns
+    
+    async def _generate_ins(
+        self,
+        patterns: List[BehavioralPattern],
+        user_id: str
+    ) -> List[UserInsight]:
+        """
+        Generate actionable insights from identified patterns
+        """
         insights = []
         
-        temporal, compliance, energy, context, goal = pattern_groups
+        # Group patterns by type for insight generation
+        pattern_groups = defaultdict(list)
+        for pattern in patterns:
+            pattern_groups[pattern.pattern_type].append(pattern)
         
-        # Temporal insights
-        if temporal.get("confidence", 0) > 0.6:
-            peak_hours = None
-            for pattern in temporal.get("patterns", []):
-                if pattern["type"] == "peak_activity_hours":
-                    peak_hours = pattern["data"]
-                    break
-            
-            if peak_hours:
-                insights.append({
-                    "type": "optimal_timing",
-                    "insight": f"You're most active during hours {peak_hours}. Schedule important tasks during these times.",
-                    "confidence": temporal["confidence"],
-                    "actionable": True
-                })
+        # Generate insights for each pattern type
+        atterns in pattern_groups.items():
+            if pattern_type == "temporal":
+                insights.extend(await self._generate_temporal_insights(type_patterns))
+            elif pattern_type == "compliance":
+                insights.extend(await self._generate_compliance_insights(type_patterns))
+            elif pattern_type == "success":
+                insights.extend(await self._generate_success_insights(type_patterns))
+            elif pattern_type == "failure":
+                f._generate_failure_insights(type_patterns))
+            elif pattern_type == "cross_domain":
+                insights.extend(await self._generate_cross_domain_insights(type_patterns))
         
-        # Compliance insights
-        if compliance.get("confidence", 0) > 0.6:
-            avg_rate = compliance.get("average_compliance_rate", 0.5)
-            if avg_rate < 0.6:
-                insights.append({
-                    "type": "compliance_improvement",
-                    "insight": f"Your compliance rate is {avg_rate:.1%}. Consider reducing intervention difficulty or frequency.",
-                    "confidence": compliance["confidence"],
-                    "actionable": True
-                })
-            elif avg_rate > 0.8:
-                insights.append({
-                    "type": "compliance_success",
-                    "insight": f"Excellent compliance rate of {avg_rate:.1%}! You might be ready for more challenging goals.",
-                    "confidence": compliance["confidence"],
-                    "actionable": True
-                })
-        
-        # Energy insights
-        if energy.get("confidence", 0) > 0.6:
-            peak_energy_hours = energy.get("peak_energy_hours", [])
-            if peak_energy_hours:
-                insights.append({
-                    "type": "energy_optimization",
-                    "insight": f"Your energy peaks during hours {peak_energy_hours}. Schedule demanding tasks then.",
-                    "confidence": energy["confidence"],
-                    "actionable": True
-                })
-        
-        # Goal insights
-        if goal.get("confidence", 0) > 0.6:
-            domain_progress = goal.get("domain_avg_progress", {})
-            if domain_progress:
-                best_domain = max(domain_progress.items(), key=lambda x: x[1])
-                worst_domain = min(domain_progress.items(), key=lambda x: x[1])
-                
-                if best_domain[1] - worst_domain[1] > 0.3:  # Significant difference
-                    insights.append({
-                        "type": "domain_performance",
-                        "insight": f"You excel in {best_domain[0]} ({best_domain[1]:.1%}) but struggle with {worst_domain[0]} ({worst_domain[1]:.1%}). Consider applying successful strategies across domains.",
-                        "confidence": goal["confidence"],
-                        "actionable": True
-                    })
+        # Generate meta-insights from pattern combinations
+        meta_insights = await self._generate_meta_insights(patterns)
+        insights.extend(meta_insights)
         
         return insights
     
-    def _generate_pattern_recommendations(self, insights: List[Dict[str, Any]]) -> List[str]:
-        """Generate specific recommendations based on insights"""
-        recommendations = []
+    async def _generate_temporal_insights(self, patterns: List[BehavioralPattern]) -> List[UserInsight]:
+        """Generate insights from temporal patterns"""
+        insights = []
         
-        for insight in insights:
-            if insight["type"] == "optimal_timing":
-                recommendations.append("Schedule your most important goals during your peak activity hours")
-            elif insight["type"] == "compliance_improvement":
-                recommendations.append("Reduce intervention difficulty by 20% to improve compliance")
-                recommendations.append("Increase intervention spacing to reduce overwhelm")
-            elif insight["type"] == "energy_optimization":
-                recommendations.append("Align demanding tasks with your natural energy peaks")
-            elif insight["type"] == "domain_performance":
-                recommendations.append("Apply successful strategies from your best-performing domain to struggling areas")
+        for pattern in patterns:
+            if "Peak performance hours" in pattern.description:
+                peak_hours = pattern.supporting_data.get("peak_hours", [])
+                
+                insights.append(UserInsight(
+                    insight_type="optimization",
+                    title="Optimize Intervention Timing",
+            . Scheduling important tasks during these hours could improve success rates by up to 30%.",
+                    confidence=pattern.confidence,
+                    potential_impact=0.8,
+                    recommended_actions=[
+                        f"Schedule high-priority interventions during {peak_hours}",
+                        "Set up automatic intervention scheduling",
+                        "Use calendar blocking for peak performance hours"
+                    ],
+        s=[pattern]
+                ))
         
-        return recommendations
+        return insights
     
-    def _get_default_patterns(self, user_id: str) -> Dict[str, Any]:
-        """Return default patterns when analysis fails"""
-        return {
-            "user_id": user_id,
-            "analysis_timestamp": datetime.utcnow().isoformat(),
-            "confidence": 0.0,
-            "temporal_patterns": {"confidence": 0.0, "patterns": []},
-            "compliance_patterns": {"confidence": 0.0, "average_compliance_rate": 0.6},
-            "energy_patterns": {"confidence": 0.0, "patterns": []},
-            "context_patterns": {"confidence": 0.0, "patterns": []},
-            "goal_patterns": {"confidence": 0.0, "patterns": []},
-            "insights": [],
-            "recommendations": ["Start with simple, consistent actions", "Track your progress daily"]
+    async def _generate_compliance_insights(self, patterns: List[BehavioralPattern]) -> List[UserInsight]:
+        """Generate insights from compliance patterns"""
+        insights = []
+        
+        for pattern in patterns:
+            if "Highest compliance" in pattern.description:
+                best_domain = pattern.supporting_data.get("best_domain")
+                worst_domain = pattern.supporting_data.get("worst_domain")
+                
+                insights.append(UserInsight(
+                    insight_type="optimization",
+                    title="Leverage Domain Strengths",
+                    description=f"Your success in {best_domain} can be applied to improve {worst_domain} performance. Cross-domain strategy transfer could boost overall success rates.",
+                    confidence=pattern.confidence,
+                    potential_impact=0.7,
+                    recommended_actions=[
+                        f"Apply successful {best_domain} strategies to {worst_domain}",
+                        "Identify specific success factors for replication",
+                        "Create cross-domain goal connections"
+                    ],
+                    supporting_patterns=[pattern]
+                ))
+        
+        return insights
+    
+    async def _generate_failure_insights(self, patterns: List[BehavioralPattern]) -> List[UserInsight]:
+        """Generate insights from failure patterns"""
+        insights = []
+        
+        for pattern in patterns:
+            if "failure streak" in pattern.description:
+                avg_failure_streak = pattern.supporting_data.get("avg_failure_streak", 0)
+                
+                if avg_failure_streak > 2:
+                    insights.append(UserInsight(
+                        insight_type="warning",
+                        title="Failure Recovery Strategy Needed",
+                        description=f"Yourer recovery strategies. Early intervention during setbacks could prevent longer failure periods.",
+                        confidence=pattern.confidence,
+                        potential_impact=0.9,
+                        recommended_actions=[
+                            "Implement immediate failure recovery protocols",
+                            "Reduce intervention difficulty after failures",
+                            "Add motivational support during challenging periods",
+                            "Create accountability partnerships"
+                        ],
+                        supporting_patterns=[pattern]
+                    ))
+        
+        return insights
+    
+    async def _generate_success_insights(self, patterns: List[BehavioralPattern]) -> List[UserInsight]:
+        """Generate insights from success patterns"""
+        insights = []
+        
+        for pattern in patterns:
+            if "success streak" in pattern.description:
+                max_streak = px_success_streak", 0)
+                
+                insights.append(UserInsight(
+                    insight_type="opportunity",
+                    title="Build on Success Momentum",
+                    description=f"Your maximum success streak of {max_streak} shows you can maintain consistency. Identifying and replicating the conditions that led to this streak could significantly improve your overall performance.",
+                    confidence=pattern.confidence,
+                    potential_impact=0.8,
+                    recommended_actions=[
+                        "Analyze factors contributing to your longest success streak",
+                        "Create conditions that support sustained success",
+                        "Use streak momentum to tackle challenging goals",
+                        "Celebrate and reinforce successful patterns"
+                    ],
+                    supporting_patterns=[pattern]
+                ))
+        
+        return insights
+    
+    async def _generate_cross_domain_insights(self, patterns: List[BehavioralPattern]) -> List[UserInsight]:
+        """Generate insights from cross-domain patterns"""
+        insights = []
+        
+        for pattern in patterns:
+            if "correlation between" in pattern.description:
+                domain1 = pattern.supporting_data.get("domain1")
+                domain2 = pattern.supporting_data.get("domain2")
+                correlation = pattern.supporting_data.get("correlation", 0)
+                
+                if correlatio5:
+                    insights.append(UserInsight(
+                        insight_type="optimization",
+                        title="Leverage Domain Synergies",
+                        description=f"Strong positive correlation between {domain1} and {domain2} suggests these goals support each other. Coordinating efforts in these domains could amplify your success.",
+                        confidence=pattern.confidence,
+                        potential_impact=0.7,
+                        recommended_actions=[
+                            f"Schedule {domain1} and {domain2} activities together",
+                            "Create combined interventions for both domains",
+                            "Use success in one domain to motivate the other"
+                        ],
+                        supporting_patterns=[pattern]
+                    ))
+                elif correlation < -0.5:
+                    insights.append(UserInsight(
+                        insight_type="warning",
+                        title="Manage Domain Conflicts",
+                        description=f"Negative correlation between {domain1} and {domain2} suggests potential conflict. Better scheduling and resource allocation could prevent interference between these goals.",
+                        confidence=pattern.confidence,
+                        potential_impact=0.6,
+                        recommended_actions=[
+                            f"Separate {domain1} and {domain2} activities in time",
+            resources for each domain",
+                            "Monitor for signs of goal conflict"
+                        ],
+                        supporting_patterns=[pattern]
+                    ))
+        
+        return insights
+    
+    async def _generate_meta_insights(self, patterns: List[BehavioralPattern]) -> List[UserInsight]:
+        """Generate meta-insights from pattern combinations"""
+        insights = []
+        
+        # Overall pattern confidence
+        avg_confidence = np.mean([p.r p in patterns]) if patterns else 0.5
+        
+        if avg_confidence > 0.8:
+            insights.append(UserInsight(
+                insight_type="optimization",
+                title="Strong Behavioral Patterns Identified",
+                description=f"Your behavioral patterns are highly predictable (confidence: {avg_confidence:.1%}). This enables precise intervention timing and personalization for maximum effectiveness.",
+                confidence=avg_confidence,
+                potential_impa,
+                recommended_actions=[
+                    "Enable advanced personalization features",
+                    "Use predictive intervention scheduling",
+                    "Implement pattern-based goal recommendations"
+                ],
+                supporting_patterns=patterns
+            ))
+        elif avg_confidence < 0.4:
+            insights.append(UserInsight(
+                insight_type="warning",
+                title="Inconsistent Behavioral Patterns",
+                f"Your behavioral patterns show high variability (confidence: {avg_confidence:.1%}). More data collection and flexible intervention strategies may be needed.",
+                confidence=avg_confidence,
+                potential_impact=0.6,
+                recommended_actions=[
+                    "Increase intervention frequency for better data",
+                    "Use adaptive intervention strategies",
+                    "Focus on building consistent routines"
+                ],
+           g_patterns=patterns
+            ))
+        
+        return insights
+    
+    async def _create_behavioral_profile(
+        self,
+        patterns: List[BehavioralPattern],
+        insights: List[UserInsight]
+    ) -> Dict[str, Any]:
+        """
+        Create comprehensive behavioral profile
+        """
+        profile = {
+            "pattern_strength": np.mean([p.confidence for p in patterns]) if patterns else 0.5,
+            "behavioral_consistency": self._calculate_consistency_score(patterns),
+    optimization_potential": np.mean([i.potential_impact for i in insights]) if insights else 0.5,
+            "primary_success_factors": self._extract_success_factors(patterns),
+            "primary_challenges": self._extract_challenges(patterns),
+            "recommended_intervention_style": self._recommend_intervention_style(patterns, insights),
+            "optimal_intervention_frequency": self._recommend_intervention_frequency(patterns),
+            "personalization_level": medium" if len(patterns) > 2 else "low"
         }
+        
+        return profile
     
-    async def calculate_failure_risk(
+    def _calculate_consistency_score(self, patterns: List[BehavioralPattern]) -> float:
+        """Calculate behavioral consistency score"""
+        if not patterns:
+            return 0.5
+        
+        # Higher frequency patterns indicate more consistent behavior
+        frequency_scores = [p.frequency for p in patterns]
+        return np.mean(frequency_scores)
+    
+    def _extract_success_factors(self,havioralPattern]) -> List[str]:
+        """Extract key success factors from patterns"""
+        success_factors = []
+        
+        for pattern in patterns:
+            if pattern.pattern_type == "success" or pattern.impact_score > 0.7:
+                success_factors.extend(pattern.actionable_insights[:2])
+        
+        return list(set(success_factors))[:5]  # Top 5 unique factors
+    
+    def _extract_challenges(self, patterns: List[BehavioralPattern]) -> List[str]:
+        """Extract key challenges from patterns"""
+        challenges = []
+        
+        for pattern in patterns:
+            if pattern.pattern_type == "failure" or "low" in pattern.description.lower():
+                challenges.append(pattern.description)
+        
+        return challenges[:3]  # Top 3 challenges
+    
+    def _recommend_intervention_style(
         self,
-        user_patterns: Dict[str, Any],
-        current_goals: List[Dict[str, Any]],
-        recent_history: List[Dict[str, Any]]
-    ) -> float:
-        """
-        Calculate the probability of goal failure based on patterns and current state
-        """
-        try:
-            risk_factors = []
-            
-            # Compliance risk
-            compliance_rate = user_patterns.get("compliance_patterns", {}).get("average_compliance_rate", 0.6)
-            if compliance_rate < 0.4:
-                risk_factors.append(0.4)  # High risk
-            elif compliance_rate < 0.6:
-                risk_factors.append(0.2)  # Medium risk
-            
-            # Goal overload risk
-            active_goals = len([g for g in current_goals if g.get("status") == "active"])
-            if active_goals > 5:
-                risk_factors.append(0.3)
-            elif active_goals > 3:
-                risk_factors.append(0.1)
-            
-            # Progress stagnation risk
-            stagnant_goals = 0
-            for goal in current_goals:
-                progress = goal.get("progress", 0)
-                if progress < 0.2 and self._goal_age_days(goal) > 30:
-                    stagnant_goals += 1
-            
-            if stagnant_goals > 0:
-                risk_factors.append(min(0.4, stagnant_goals * 0.15))
-            
-            # Recent activity decline
-            if len(recent_history) < 5:  # Very little recent activity
-                risk_factors.append(0.25)
-            
-            # Energy pattern mismatch
-            energy_patterns = user_patterns.get("energy_patterns", {})
-            if energy_patterns.get("confidence", 0) > 0.6:
-                current_energy = energy_patterns.get("current_energy")
-                if current_energy and isinstance(current_energy, str):
-                    if current_energy.lower() == "low":
-                        risk_factors.append(0.15)
-            
-            # Calculate overall risk
-            if not risk_factors:
-                return 0.2  # Base risk
-            
-            # Combine risk factors (not simply additive to avoid over-penalization)
-            combined_risk = 1 - (1 - sum(risk_factors)) ** 0.5
-            return min(0.95, max(0.05, combined_risk))
-            
-        except Exception as e:
-            logger.error(f"Failure risk calculation failed: {str(e)}")
-            return 0.5  # Default medium risk
+        patterns: List[BehavioralPattern],
+        insights: List[UserInsight]
+    ) -> str:
+        """Recommend intervention style based on patterns"""
+        
+        # Count pattern types
+        pattern_types = [p.pattern_type for p in patterns]
+        
+        if pattern_types.count("failure") > pattern_types.count("success"):
+            return "supportive"  # More support needed
+        elif pattern_types.count("temporal") > 2:
+            return "scheduled"  # Time-based interventions work well
+        elif any("compliance" in p.pattern_type for p in patterns):
+            return "adaptive"  # Need flexible approaches
+        else:
+            return "motivati  # Standard motivational approach
     
-    def _goal_age_days(self, goal: Dict[str, Any]) -> int:
-        """Calculate how many days old a goal is"""
-        try:
-            created_date = goal.get("created_date")
-            if created_date:
-                created = datetime.fromisoformat(created_date.replace("Z", "+00:00"))
-                return (datetime.utcnow() - created).days
-        except:
-            pass
-        return 0
+    def _recommend_intervention_frequency(self, patterns: List[BehavioralPattern]) -> str:
+        """Recommend intervention frequency based on patterns"""
+        
+        # Look for energy/frequency patterns
+        for pattern in patterns:
+            if "frequency" in pattern.description.lower():
+                optimal_freq = pattern.supporting_data.get("optimal_frequency", "12-24h")
+                return optimal_freq
+        
+        # Default based on pattern stngth
+        avg_confidence = np.mean([p.confidence for p in patterns]) if patterns else 0.5
+        
+        if avg_confidence > 0.8:
+            return "12-24h"  # Can handle regular interventions
+        elif avg_confidence > 0.6:
+            return "24-48h"  # Moderate frequency
+        else:
+            return "48h+"  # Lower frequency to avoid overwhelm
+          = pd.DataFrame(context_history)
+        
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        return df       df['complied'] = False
+        
+        return df
     
-    async def analyze_goal_interactions(
-        self,
-        goals: List[Dict[str, Any]],
-        history: List[Dict[str, Any]]
-    ) -> List[GoalInteraction]:
-        """
-        Analyze how goals interact with each other across domains
-        """
-        if len(goals) < 2:
-            return []
+    def _prepare_goal_data(self, goals: List[Dict[str, Any]]) -> pd.DataFrame:
+        """Prepare goal data for analysis"""
+        if not goals:
+            return pd.DataFrame()
         
-        interactions = []
-        
-        # Analyze each pair of goals
-        for i, goal1 in enumerate(goals):
-            for j, goal2 in enumerate(goals[i+1:], i+1):
-                interaction = await self._analyze_goal_pair_interaction(goal1, goal2, history)
-                if interaction and interaction.impact_score > self.interaction_significance_threshold:
-                    interactions.append(interaction)
-        
-        return interactions
+        return pd.DataFrame(goals)
     
-    async def _analyze_goal_pair_interaction(
-        self,
-        goal1: Dict[str, Any],
-        goal2: Dict[str, Any],
-        history: List[Dict[str, Any]]
-    ) -> Optional[GoalInteraction]:
-        """
-        Analyze interaction between two specific goals
-        """
-        domain1 = goal1.get("domain", "unknown")
-        domain2 = goal2.get("domain", "unknown")
+    def _prepare_context_data(self, context_history: List[Dict[str, Any]]) -> pd.DataFrame:
+        """Prepare context data for analysis"""
+        if not context_history:
+            return pd.DataFrame()
         
-        if domain1 == domain2:
-            return None  # Same domain interactions are handled elsewhere
+        dfions)
         
-        # Known domain interactions
-        interaction_matrix = {
-            ("health", "productivity"): {
-                "type": "synergistic",
-                "impact": 0.7,
-                "effect": "positive",
-                "recommendation": "Exercise boosts cognitive performance. Schedule workouts before important work."
-            },
-            ("health", "finance"): {
-                "type": "competing",
-                "impact": 0.4,
-                "effect": "negative",
-                "recommendation": "Gym memberships and healthy food cost money. Budget for health investments."
-            },
-            ("productivity", "learning"): {
-                "type": "synergistic",
-                "impact": 0.8,
-                "effect": "positive",
-                "recommendation": "Learning new skills enhances productivity. Combine learning with work projects."
-            },
-            ("finance", "social"): {
-                "type": "competing",
-                "impact": 0.5,
-                "effect": "negative",
-                "recommendation": "Social activities often involve spending. Plan budget-friendly social activities."
-            },
-            ("health", "social"): {
-                "type": "synergistic",
-                "impact": 0.6,
-                "effect": "positive",
-                "recommendation": "Social fitness activities combine both goals. Join group fitness classes."
-            }
-        }
+        # Ensure required columns exist
+        if 'timestamp' in df.columns:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df['hour'] = df['timestamp'].dt.hour
+            df['day_of_week'] = df['timestamp'].dt.day_name()
+            df['date'] = df['timestamp'].dt.date
         
-        # Check both directions
-        key1 = (domain1, domain2)
-        key2 = (domain2, domain1)
+        # Ensure compliance column exists
+        if 'user_complied' in df.columns:
+            df['complied'] = df['user_complied'].fillna(False)
+        elif 'complied' not in df.columns:
+     []
+        seen = set()
+        for rec in recommendations:
+            if rec not in seen:
+                unique_recommendations.append(rec)
+                seen.add(rec)
         
-        interaction_data = interaction_matrix.get(key1) or interaction_matrix.get(key2)
+        return unique_recommendations[:10]  # Top 10 recommendations
+    
+    def _prepare_intervention_data(self, interventions: List[Dict[str, Any]]) -> pd.DataFrame:
+        """Prepare intervention data for analysis"""
+        if not interventions:
+            return pd.DataFrame()
         
-        if interaction_data:
-            return GoalInteraction(
-                source_domain=domain1,
-                target_domain=domain2,
-                interaction_type=interaction_data["type"],
-                impact_score=interaction_data["impact"],
-                effect_type=interaction_data["effect"],
-                recommendation=interaction_data["recommendation"],
-                evidence=["domain_interaction_matrix"]
-            )
-        
-        # Default neutral interaction
-        return GoalInteraction(
-            source_domain=domain1,
-            target_domain=domain2,
-            interaction_type="neutral",
-            impact_score=0.1,
-            effect_type="neutral",
-            recommendation=f"Monitor how {domain1} and {domain2} goals affect each other.",
-            evidence=["default_analysis"]
+        df = pd.DataFrame(intervent
+        # Prioritize by potential impact and confidence
+        prioritized_insights = sorted(
+            insights,
+            key=lambda x: x.potential_impact * x.confidence,
+            reverse=True
         )
+        
+        recommendations = []
+        for insight in prioritized_insights[:5]:  # Top 5 insights
+            recommendations.extend(insight.recommended_actions[:2])  # Top 2 actions per insight
+        
+        # Remove duplicates while preserving order
+        unique_recommendations =
+    async def _generate_recommendations(self, insights: List[UserInsight]) -> List[str]:
+        """Generate top recommendations from insights"""
+    

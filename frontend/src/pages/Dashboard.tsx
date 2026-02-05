@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -7,16 +7,17 @@ import {
   Typography,
   LinearProgress,
   Chip,
-  Button,
   Avatar,
   IconButton,
+  Button,
+  Alert,
+  Skeleton,
   Divider,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
-  Paper,
-  Alert,
+  ListItemText,
+  Paper
 } from '@mui/material';
 import {
   TrendingUp,
@@ -26,29 +27,26 @@ import {
   CheckCircle,
   Warning,
   Info,
+  Star,
+  Timeline,
+  Speed,
+  Security,
+  Accuracy,
+  EmojiEvents,
   FitnessCenter,
   AttachMoney,
   Work,
   School,
-  People,
-  Lightbulb,
-  Timeline,
+  People
 } from '@mui/icons-material';
-import { motion } from 'framer-motion';
 import { useQuery } from 'react-query';
+import { motion } from 'framer-motion';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import toast from 'react-hot-toast';
 
-// Components
-import InterventionCard from '../components/dashboard/InterventionCard';
-import GoalProgressCard from '../components/dashboard/GoalProgressCard';
-import AIReliabilityCard from '../components/dashboard/AIReliabilityCard';
-import TodaysPlanCard from '../components/dashboard/TodaysPlanCard';
-import QuickActionsCard from '../components/dashboard/QuickActionsCard';
+import { dashboardApi } from '../services/api';
+import { useAuthStore } from '../stores/authStore';
 
-// Services
-import { dashboardService } from '../services/dashboardService';
-import { interventionService } from '../services/interventionService';
-
-// Types
 interface DashboardData {
   user: {
     id: string;
@@ -80,97 +78,85 @@ interface DashboardData {
   }>;
 }
 
-const Dashboard: React.FC = () => {
-  const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
+const domainIcons = {
+  health: FitnessCenter,
+  finance: AttachMoney,
+  productivity: Work,
+  learning: School,
+  social: People
+};
 
-  // Fetch dashboard data
+const domainColors = {
+  health: '#4CAF50',
+  finance: '#2196F3',
+  productivity: '#FF9800',
+  learning: '#9C27B0',
+  social: '#E91E63'
+};
+
+const Dashboard: React.FC = () => {
+  const { user } = useAuthStore();
+  const [selectedTimeframe, setSelectedTimeframe] = useState('week');
+
   const { data: dashboardData, isLoading, error } = useQuery<DashboardData>(
     'dashboard',
-    dashboardService.getDashboardData,
+    dashboardApi.getDashboardData,
     {
-      refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-    }
-  );
-
-  // Fetch recent interventions
-  const { data: recentInterventions } = useQuery(
-    'recent-interventions',
-    () => interventionService.getRecentInterventions(5),
-    {
-      refetchInterval: 2 * 60 * 1000, // Refetch every 2 minutes
+      refetchInterval: 30000, // Refresh every 30 seconds
+      onError: (error) => {
+        toast.error('Failed to load dashboard data');
+        console.error('Dashboard error:', error);
+      }
     }
   );
 
   if (isLoading) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Loading your dashboard...
-        </Typography>
-        <LinearProgress />
-      </Box>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">
-          Failed to load dashboard data. Please try refreshing the page.
+          Failed to load dashboard. Please try refreshing the page.
         </Alert>
       </Box>
     );
   }
 
-  const getDomainIcon = (domain: string) => {
-    switch (domain) {
-      case 'health': return <FitnessCenter />;
-      case 'finance': return <AttachMoney />;
-      case 'productivity': return <Work />;
-      case 'learning': return <School />;
-      case 'social': return <People />;
-      default: return <TrendingUp />;
-    }
-  };
-
-  const getDomainColor = (domain: string) => {
-    switch (domain) {
-      case 'health': return '#10b981';
-      case 'finance': return '#f59e0b';
-      case 'productivity': return '#6366f1';
-      case 'learning': return '#8b5cf6';
-      case 'social': return '#ec4899';
-      default: return '#6b7280';
-    }
-  };
+  if (!dashboardData) {
+    return null;
+  }
 
   return (
-    <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
-      {/* Header Section */}
+    <Box sx={{ p: 3 }}>
+      {/* Welcome Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h3" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
-            Good morning, {dashboardData?.user.name}! 🌅
+          <Typography variant="h4" gutterBottom>
+            Good {getTimeOfDay()}, {dashboardData.user.name}! 👋
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, mb: 2 }}>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            🎯 Today's Focus: {dashboardData.today_focus}
+          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2 }}>
             <Chip
-              icon={<TrendingUp />}
-              label={`${dashboardData?.user.streak_days} day streak`}
-              color="success"
-              variant="outlined"
-            />
-            <Chip
-              icon={<Psychology />}
-              label={`Today's focus: ${dashboardData?.today_focus}`}
+              icon={<EmojiEvents />}
+              label={`${dashboardData.user.streak_days} day streak`}
               color="primary"
               variant="outlined"
             />
             <Chip
-              label={`Energy: ${dashboardData?.energy_level}`}
+              label={`⚡ Energy: ${dashboardData.energy_level}`}
+              color="secondary"
+              variant="outlined"
+            />
+            <Chip
+              label={`${dashboardData.user.active_goals}/${dashboardData.user.total_goals} active goals`}
               color="info"
               variant="outlined"
             />
@@ -179,47 +165,80 @@ const Dashboard: React.FC = () => {
       </motion.div>
 
       <Grid container spacing={3}>
-        {/* Left Column */}
-        <Grid item xs={12} lg={8}>
-          {/* AI Reliability Card */}
+        {/* AI Reliability Dashboard */}
+        <Grid item xs={12} lg={4}>
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <AIReliabilityCard data={dashboardData?.ai_reliability} />
-          </motion.div>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Psychology color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="h6">AI Reliability</Typography>
+                </Box>
+                
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  This week: {dashboardData.ai_reliability.interventions_this_week} interventions | {dashboardData.ai_reliability.helpful_percentage}% helpful
+                </Typography>
 
-          {/* Goals Overview */}
+                <Box sx={{ mt: 3 }}>
+                  <ReliabilityMetric
+                    icon={<Security />}
+                    label="Safety Score"
+                    value={dashboardData.ai_reliability.safety_score}
+                    color="#4CAF50"
+                  />
+                  <ReliabilityMetric
+                    icon={<TrendingUp />}
+                    label="Relevance Score"
+                    value={dashboardData.ai_reliability.relevance_score}
+                    color="#2196F3"
+                  />
+                  <ReliabilityMetric
+                    icon={<Accuracy />}
+                    label="Accuracy Score"
+                    value={dashboardData.ai_reliability.accuracy_score}
+                    color="#FF9800"
+                  />
+                </Box>
+
+                <Button
+                  variant="outlined"
+                  size="small"
+                  sx={{ mt: 2 }}
+                  onClick={() => toast.info('Detailed traces coming soon!')}
+                >
+                  View Detailed Traces →
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </Grid>
+
+        {/* Active Goals */}
+        <Grid item xs={12} lg={8}>
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            <Card sx={{ mt: 3 }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                  <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-                    📊 Active Goals
-                  </Typography>
-                  <Button variant="outlined" size="small">
-                    View All
-                  </Button>
-                </Box>
+                <Typography variant="h6" gutterBottom>
+                  📊 Active Goals
+                </Typography>
                 
                 <Grid container spacing={2}>
-                  {dashboardData?.goals.map((goal, index) => (
+                  {dashboardData.goals.map((goal, index) => (
                     <Grid item xs={12} md={6} key={goal.id}>
                       <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, delay: index * 0.1 }}
                       >
-                        <GoalProgressCard
-                          goal={goal}
-                          onSelect={() => setSelectedGoal(goal.id)}
-                          isSelected={selectedGoal === goal.id}
-                        />
+                        <GoalCard goal={goal} />
                       </motion.div>
                     </Grid>
                   ))}
@@ -227,166 +246,113 @@ const Dashboard: React.FC = () => {
               </CardContent>
             </Card>
           </motion.div>
-
-          {/* Recent Interventions */}
-          {recentInterventions && recentInterventions.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <Card sx={{ mt: 3 }}>
-                <CardContent>
-                  <Typography variant="h5" component="h2" sx={{ fontWeight: 600, mb: 3 }}>
-                    🤖 Recent AI Interventions
-                  </Typography>
-                  
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {recentInterventions.slice(0, 3).map((intervention: any, index: number) => (
-                      <motion.div
-                        key={intervention.id}
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.3, delay: index * 0.1 }}
-                      >
-                        <InterventionCard intervention={intervention} />
-                      </motion.div>
-                    ))}
-                  </Box>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
         </Grid>
 
-        {/* Right Column */}
-        <Grid item xs={12} lg={4}>
-          {/* Today's Plan */}
+        {/* Today's Plan */}
+        <Grid item xs={12} md={6}>
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <TodaysPlanCard plan={dashboardData?.todays_plan || []} />
-          </motion.div>
-
-          {/* Quick Actions */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-          >
-            <QuickActionsCard />
-          </motion.div>
-
-          {/* Insights & Tips */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
-            <Card sx={{ mt: 3 }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Lightbulb sx={{ mr: 1, color: 'warning.main' }} />
-                  <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
-                    AI Insights
-                  </Typography>
+                  <Schedule color="primary" sx={{ mr: 1 }} />
+                  <Typography variant="h6">Today's Plan</Typography>
                 </Box>
                 
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  AI-generated, personalized schedule
+                </Typography>
+
                 <List dense>
-                  <ListItem>
-                    <ListItemIcon>
-                      <Info color="info" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Peak Productivity"
-                      secondary="You're most productive between 9-11 AM. Schedule important tasks then."
-                    />
-                  </ListItem>
-                  
-                  <ListItem>
-                    <ListItemIcon>
-                      <CheckCircle color="success" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Great Progress"
-                      secondary="Your consistency has improved 23% this week!"
-                    />
-                  </ListItem>
-                  
-                  <ListItem>
-                    <ListItemIcon>
-                      <Warning color="warning" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="Attention Needed"
-                      secondary="Consider meal prep to support your health goals."
-                    />
-                  </ListItem>
+                  {dashboardData.todays_plan.map((item, index) => (
+                    <ListItem key={index} sx={{ px: 0 }}>
+                      <ListItemIcon sx={{ minWidth: 40 }}>
+                        <Typography variant="body2" color="primary" fontWeight="bold">
+                          {item.time}
+                        </Typography>
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={item.action}
+                        sx={{ ml: 1 }}
+                      />
+                    </ListItem>
+                  ))}
                 </List>
               </CardContent>
             </Card>
           </motion.div>
+        </Grid>
 
-          {/* Weekly Stats */}
+        {/* Quick Actions */}
+        <Grid item xs={12} md={6}>
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
           >
-            <Card sx={{ mt: 3 }}>
+            <Card sx={{ height: '100%' }}>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Timeline sx={{ mr: 1, color: 'primary.main' }} />
-                  <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
-                    This Week
-                  </Typography>
-                </Box>
+                <Typography variant="h6" gutterBottom>
+                  ⚡ Quick Actions
+                </Typography>
                 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Goal Completion
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    78%
-                  </Typography>
-                </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={78} 
-                  sx={{ mb: 2, height: 6, borderRadius: 3 }}
-                />
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    AI Helpfulness
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    89%
-                  </Typography>
-                </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={89} 
-                  color="success"
-                  sx={{ mb: 2, height: 6, borderRadius: 3 }}
-                />
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Streak Maintenance
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    100%
-                  </Typography>
-                </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={100} 
-                  color="info"
-                  sx={{ height: 6, borderRadius: 3 }}
-                />
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<CheckCircle />}
+                      onClick={() => toast.success('Goal progress updated!')}
+                    >
+                      Log Progress
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<Psychology />}
+                      onClick={() => toast.info('AI intervention requested')}
+                    >
+                      Get AI Help
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<Timeline />}
+                      onClick={() => toast.info('Analytics coming soon!')}
+                    >
+                      View Analytics
+                    </Button>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      startIcon={<Star />}
+                      onClick={() => toast.info('New goal wizard coming soon!')}
+                    >
+                      New Goal
+                    </Button>
+                  </Grid>
+                </Grid>
+
+                <Divider sx={{ my: 2 }} />
+
+                <Typography variant="subtitle2" gutterBottom>
+                  Recent Self-Corrections:
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • Prevented overspending alert false alarm
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  • Adjusted workout after detecting fatigue
+                </Typography>
               </CardContent>
             </Card>
           </motion.div>
@@ -394,6 +360,136 @@ const Dashboard: React.FC = () => {
       </Grid>
     </Box>
   );
+};
+
+// Helper Components
+const ReliabilityMetric: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  color: string;
+}> = ({ icon, label, value, color }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+    <Box sx={{ color, mr: 1 }}>{icon}</Box>
+    <Box sx={{ flexGrow: 1 }}>
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+        <LinearProgress
+          variant="determinate"
+          value={value * 100}
+          sx={{
+            flexGrow: 1,
+            mr: 1,
+            height: 6,
+            borderRadius: 3,
+            '& .MuiLinearProgress-bar': {
+              backgroundColor: color
+            }
+          }}
+        />
+        <Typography variant="body2" fontWeight="bold">
+          {(value * 100).toFixed(0)}%
+        </Typography>
+      </Box>
+    </Box>
+  </Box>
+);
+
+const GoalCard: React.FC<{ goal: any }> = ({ goal }) => {
+  const DomainIcon = domainIcons[goal.domain as keyof typeof domainIcons] || Work;
+  const domainColor = domainColors[goal.domain as keyof typeof domainColors] || '#666';
+
+  return (
+    <Paper
+      elevation={1}
+      sx={{
+        p: 2,
+        borderLeft: `4px solid ${domainColor}`,
+        '&:hover': {
+          elevation: 3,
+          transform: 'translateY(-2px)',
+          transition: 'all 0.2s ease-in-out'
+        }
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 1 }}>
+        <Avatar
+          sx={{
+            bgcolor: domainColor,
+            width: 32,
+            height: 32,
+            mr: 1.5
+          }}
+        >
+          <DomainIcon sx={{ fontSize: 18 }} />
+        </Avatar>
+        <Box sx={{ flexGrow: 1 }}>
+          <Typography variant="subtitle2" fontWeight="bold">
+            {goal.title}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {goal.domain.toUpperCase()}
+          </Typography>
+        </Box>
+        <Typography variant="h6" color="primary" fontWeight="bold">
+          {goal.progress}%
+        </Typography>
+      </Box>
+
+      <LinearProgress
+        variant="determinate"
+        value={goal.progress}
+        sx={{
+          mb: 1,
+          height: 6,
+          borderRadius: 3,
+          '& .MuiLinearProgress-bar': {
+            backgroundColor: domainColor
+          }
+        }}
+      />
+
+      <Typography variant="body2" gutterBottom>
+        <strong>Next:</strong> {goal.next_action}
+      </Typography>
+
+      <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+        💡 {goal.ai_insight}
+      </Typography>
+    </Paper>
+  );
+};
+
+const DashboardSkeleton: React.FC = () => (
+  <Box sx={{ p: 3 }}>
+    <Skeleton variant="text" width="60%" height={40} />
+    <Skeleton variant="text" width="40%" height={30} sx={{ mb: 3 }} />
+    
+    <Grid container spacing={3}>
+      <Grid item xs={12} md={4}>
+        <Skeleton variant="rectangular" height={300} />
+      </Grid>
+      <Grid item xs={12} md={8}>
+        <Skeleton variant="rectangular" height={300} />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <Skeleton variant="rectangular" height={400} />
+      </Grid>
+      <Grid item xs={12} md={6}>
+        <Skeleton variant="rectangular" height={400} />
+      </Grid>
+    </Grid>
+  </Box>
+);
+
+// Helper Functions
+const getTimeOfDay = (): string => {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
 };
 
 export default Dashboard;
