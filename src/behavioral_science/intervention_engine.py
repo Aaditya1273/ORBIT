@@ -1,166 +1,166 @@
 """
-ORBIT Intervention Engine
-Advanced behavioral science intervention generation and enhancement
+ORBIT Behavioral Science Intervention Engine
+World-class behavioral science implementation for habit formation and behavior change
 """
 
 import json
 import random
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
-
 import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-class InterventionTechnique(Enum):
-    """Behavioral science techniques for intervention enhancement"""
-    IMPLEMENTATION_INTENTION = "implementation_intention"
-    TEMPTATION_BUNDLING = "temptation_bundling"
+class BehavioralTechnique(Enum):
+    """Behavioral science techniques available in ORBIT"""
+    IMPLEMENTATION_INTENTIONS = "implementation_intentions"
     HABIT_STACKING = "habit_stacking"
+    TEMPTATION_BUNDLING = "temptation_bundling"
     SOCIAL_PROOF = "social_proof"
     LOSS_AVERSION = "loss_aversion"
     FRESH_START_EFFECT = "fresh_start_effect"
-    COMMITMENT_DEVICE = "commitment_device"
-    ENVIRONMENTAL_DESIGN = "environmental_design"
-    FRICTION_REDUCTION = "friction_reduction"
     FRICTION_INJECTION = "friction_injection"
+    COMMITMENT_DEVICE = "commitment_device"
+    MENTAL_CONTRASTING = "mental_contrasting"
+    ENVIRONMENTAL_DESIGN = "environmental_design"
 
 
 @dataclass
-class BehavioralTechnique:
-    """Structured behavioral science technique"""
-    name: str
-    description: str
-    effectiveness_score: float  # 0.0 to 1.0
-    applicable_domains: List[str]
-    implementation_difficulty: str  # "easy", "medium", "hard"
-    evidence_strength: str  # "weak", "moderate", "strong"
+class InterventionContext:
+    """Context for behavioral intervention"""
+    user_id: str
+    goal_domain: str
+    current_behavior: str
+    desired_behavior: str
+    user_patterns: Dict[str, Any]
+    environmental_factors: Dict[str, Any]
+    historical_compliance: float
+    energy_level: float
+    time_of_day: int
+    day_of_week: int
+    streak_count: int
+    recent_failures: int
+
+
+@dataclass
+class BehavioralIntervention:
+    """Structured behavioral intervention"""
+    technique: BehavioralTechnique
+    content: str
+    implementation_plan: str
+    success_metrics: List[str]
+    expected_compliance: float
+    difficulty_level: int  # 1-5
+    time_investment: int  # minutes
+    environmental_requirements: List[str]
+    fallback_strategy: str
+    behavioral_rationale: str
 
 
 class InterventionEngine:
     """
-    Advanced behavioral science engine for intervention enhancement
+    Core engine for generating behavioral science-backed interventions
     """
     
     def __init__(self):
-        self.techniques = self._initialize_techniques()
-        self.domain_strategies = self._initialize_domain_strategies()
-        self.crisis_protocols = self._initialize_crisis_protocols()
+        self.technique_library = self._initialize_technique_library()
+        self.success_patterns = self._load_success_patterns()
+        self.personalization_rules = self._load_personalization_rules()
         
         logger.info("Intervention Engine initialized with behavioral science techniques")
     
-    def _initialize_techniques(self) -> Dict[str, BehavioralTechnique]:
-        """Initialize behavioral science techniques database"""
-        return {
-            "implementation_intention": BehavioralTechnique(
-                name="Implementation Intention",
-                description="If-then planning: 'If situation X occurs, then I will do Y'",
-                effectiveness_score=0.85,
-                applicable_domains=["health", "productivity", "learning", "finance"],
-                implementation_difficulty="easy",
-                evidence_strength="strong"
-            ),
-            "temptation_bundling": BehavioralTechnique(
-                name="Temptation Bundling",
-                description="Pair a want with a should: 'Only watch Netflix while exercising'",
-                effectiveness_score=0.78,
-                applicable_domains=["health", "learning", "productivity"],
-                implementation_difficulty="medium",
-                evidence_strength="strong"
-            ),
-            "habit_stacking": BehavioralTechnique(
-                name="Habit Stacking",
-                description="After existing habit X, I will do new habit Y",
-                effectiveness_score=0.82,
-                applicable_domains=["health", "productivity", "learning", "social"],
-                implementation_difficulty="easy",
-                evidence_strength="strong"
-            ),
-            "social_proof": BehavioralTechnique(
-                name="Social Proof",
-                description="Show that similar people are successfully doing the behavior",
-                effectiveness_score=0.75,
-                applicable_domains=["health", "finance", "learning", "social"],
-                implementation_difficulty="easy",
-                evidence_strength="strong"
-            ),
-            "loss_aversion": BehavioralTechnique(
-                name="Loss Aversion",
-                description="Frame in terms of what user will lose by not acting",
-                effectiveness_score=0.73,
-                applicable_domains=["finance", "health", "productivity"],
-                implementation_difficulty="easy",
-                evidence_strength="strong"
-            ),
-            "fresh_start_effect": BehavioralTechnique(
-                name="Fresh Start Effect",
-                description="Leverage temporal landmarks for new beginnings",
-                effectiveness_score=0.68,
-                applicable_domains=["health", "finance", "productivity", "learning"],
-                implementation_difficulty="easy",
-                evidence_strength="moderate"
-            ),
-            "commitment_device": BehavioralTechnique(
-                name="Commitment Device",
-                description="Create stakes or accountability to increase follow-through",
-                effectiveness_score=0.80,
-                applicable_domains=["health", "finance", "productivity", "learning"],
-                implementation_difficulty="medium",
-                evidence_strength="strong"
-            ),
-            "environmental_design": BehavioralTechnique(
-                name="Environmental Design",
-                description="Modify environment to make good choices easier",
-                effectiveness_score=0.88,
-                applicable_domains=["health", "finance", "productivity"],
-                implementation_difficulty="medium",
-                evidence_strength="strong"
-            ),
-            "friction_reduction": BehavioralTechnique(
-                name="Friction Reduction",
-                description="Remove barriers to desired behaviors",
-                effectiveness_score=0.85,
-                applicable_domains=["health", "productivity", "learning", "social"],
-                implementation_difficulty="medium",
-                evidence_strength="strong"
-            ),
-            "friction_injection": BehavioralTechnique(
-                name="Friction Injection",
-                description="Add barriers to undesired behaviors",
-                effectiveness_score=0.79,
-                applicable_domains=["finance", "health", "productivity"],
-                implementation_difficulty="hard",
-                evidence_strength="moderate"
+    async def generate_intervention(
+        self,
+        context: InterventionContext,
+        preferred_techniques: Optional[List[BehavioralTechnique]] = None
+    ) -> BehavioralIntervention:
+        """
+        Generate a personalized behavioral intervention based on context
+        """
+        try:
+            # Select optimal technique
+            technique = await self._select_optimal_technique(context, preferred_techniques)
+            
+            # Generate intervention content
+            intervention = await self._generate_technique_intervention(technique, context)
+            
+            # Personalize based on user patterns
+            personalized_intervention = await self._personalize_intervention(intervention, context)
+            
+            # Add environmental considerations
+            final_intervention = await self._add_environmental_design(personalized_intervention, context)
+            
+            logger.info(
+                "Behavioral intervention generated",
+                technique=technique.value,
+                expected_compliance=final_intervention.expected_compliance,
+                user_id=context.user_id
             )
-        }
+            
+            return final_intervention
+            
+        except Exception as e:
+            logger.error(
+                "Failed to generate behavioral intervention",
+                error=str(e),
+                user_id=context.user_id,
+                exc_info=True
+            )
+            
+            # Return fallback intervention
+            return await self._generate_fallback_intervention(context)
     
-    def _initialize_domain_strategies(self) -> Dict[str, Dict[str, Any]]:
-        """Initialize domain-specific intervention strategies"""
-        return {
-            "health": {
-                "primary_techniques": ["habit_stacking", "environmental_design", "implementation_intention"],
-                "crisis_techniques": ["friction_reduction", "social_proof"],
-                "motivation_boosters": ["loss_aversion", "commitment_device"],
-                "common_barriers": ["time_constraints", "energy_levels", "weather", "social_pressure"],
-                "success_predictors": ["consistency", "enjoyment", "social_support", "convenience"]
-            },
-            "finance": {
-                "primary_techniques": ["friction_injection", "loss_aversion", "environmental_design"],
-                "crisis_techniques": ["commitment_device", "implementation_intention"],
-                "motivation_boosters": ["social_proof", "fresh_start_effect"],
-                "common_barriers": ["impulse_spending", "lifestyle_inflation", "peer_pressure"],
-                "success_predictors": ["automation", "clear_goals", "emergency_fund", "tracking"]
-            },
-            "productivity": {
-                "primary_techniques": ["implementation_intention", "environmental_design", "habit_stacking"],
-                "crisis_techniques": ["friction_reduction", "temptation_bundling"],
-                "motivation_boosters": ["social_proof", "commitment_device"],
-                "common_barriers": ["distractions", "perfectionism", "overwhelm", "procrastination"],
-                "success_predictors": ["clear_priorities", "time_blocking", "energy_management"]
-            },
+    async def _select_optimal_technique(
+        self,
+        context: InterventionContext,
+        preferred_techniques: Optional[List[BehavioralTechnique]] = None
+    ) -> BehavioralTechnique:
+        """
+        Select the most appropriate behavioral technique based on context
+        """
+        # Calculate technique scores
+        technique_scores = {}
+        
+        available_techniques = preferred_techniques or list(BehavioralTechnique)
+        
+        for technique in available_techniques:
+            score = await self._calculate_technique_score(technique, context)
+            technique_scores[technique] = score
+        
+        # Select highest scoring technique
+        best_technique = max(technique_scores, key=technique_scores.get)
+        
+        logger.debug(
+            "Technique selected",
+            technique=best_technique.value,
+            score=technique_scores[best_technique],
+            all_scores=[(t.value, s) for t, s in technique_scores.items()]
+        )
+        
+        return best_technique
+    
+    async def _calculate_technique_score(
+        self,
+        technique: BehavioralTechnique,
+        context: InterventionContext
+    ) -> float:
+        """
+        Calculate effectiveness score for a technique given the context
+        """
+        base_score = 0.5
+        
+        # Historical compliance factor
+        compliance_factor = min(context.historical_compliance * 1.5, 1.0)
+        
+        # Technique-specific scoring
+        if technique == BehavioralTechnique.IMPLEMENTATION_INTENTIONS:
+            # Works well for specific, concrete behaviors
+            if "specific" in context.desired_behavior.lower():
+                base_score += 0.3
+            if context.energy_level > 0.7:
             "learning": {
                 "primary_techniques": ["habit_stacking", "temptation_bundling", "implementation_intention"],
                 "crisis_techniques": ["friction_reduction", "social_proof"],
