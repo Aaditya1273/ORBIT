@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   AppBar,
   Toolbar,
   Typography,
   IconButton,
   Avatar,
+  Box,
+  Badge,
   Menu,
   MenuItem,
-  Badge,
-  Box,
-  Tooltip,
   Divider,
   ListItemIcon,
   ListItemText,
@@ -23,12 +22,10 @@ import {
   Logout,
   DarkMode,
   LightMode,
-  Psychology,
-  Help,
-  Feedback
+  Psychology
 } from '@mui/icons-material';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -36,7 +33,7 @@ import { useThemeStore } from '../../stores/themeStore';
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const { isDarkMode, toggleDarkMode } = useThemeStore();
+  const { isDarkMode, toggleTheme } = useThemeStore();
   
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
@@ -49,58 +46,25 @@ const Navbar: React.FC = () => {
     setAnchorEl(null);
   };
 
-  const handleNotificationMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
   };
 
-  const handleNotificationMenuClose = () => {
+  const handleNotificationClose = () => {
     setNotificationAnchor(null);
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+  const handleLogout = () => {
+    logout();
     handleProfileMenuClose();
-  };
-
-  const handleSettings = () => {
-    navigate('/settings');
-    handleProfileMenuClose();
-  };
-
-  const handleAIHelp = () => {
-    toast.info('AI Assistant coming soon!');
+    navigate('/login');
   };
 
   const mockNotifications = [
-    {
-      id: 1,
-      title: 'Daily Plan Ready',
-      message: 'Your personalized plan for today is ready',
-      time: '5 minutes ago',
-      unread: true
-    },
-    {
-      id: 2,
-      title: 'Goal Progress Update',
-      message: 'You\'re 78% complete on your exercise goal!',
-      time: '1 hour ago',
-      unread: true
-    },
-    {
-      id: 3,
-      title: 'AI Insight',
-      message: 'Your productivity peaks at 10 AM - schedule important tasks then',
-      time: '3 hours ago',
-      unread: false
-    }
+    { id: 1, title: 'Goal Progress Update', message: 'You\'re 80% towards your fitness goal!', time: '5m ago' },
+    { id: 2, title: 'AI Insight', message: 'New pattern detected in your productivity', time: '1h ago' },
+    { id: 3, title: 'Weekly Summary', message: 'Your weekly report is ready', time: '2h ago' }
   ];
-
-  const unreadCount = mockNotifications.filter(n => n.unread).length;
 
   return (
     <AppBar 
@@ -109,86 +73,51 @@ const Navbar: React.FC = () => {
       sx={{ 
         bgcolor: 'background.paper',
         color: 'text.primary',
-        borderBottom: 1,
+        borderBottom: '1px solid',
         borderColor: 'divider'
       }}
     >
-      <Toolbar>
-        {/* Logo/Brand */}
-        <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
-          <Typography
-            variant="h6"
-            component="div"
-            sx={{
-              fontWeight: 'bold',
-              background: 'linear-gradient(45deg, #6366f1, #8b5cf6)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              cursor: 'pointer'
-            }}
-            onClick={() => navigate('/dashboard')}
-          >
+      <Toolbar sx={{ justifyContent: 'space-between' }}>
+        {/* Left side - Logo/Title */}
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Psychology sx={{ mr: 1, color: 'primary.main' }} />
+          <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
             ORBIT
           </Typography>
         </Box>
 
-        {/* Action Buttons */}
+        {/* Right side - Actions */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {/* AI Assistant */}
-          <Tooltip title="AI Assistant">
-            <IconButton
-              color="inherit"
-              onClick={handleAIHelp}
-              sx={{
-                bgcolor: 'primary.main',
-                color: 'primary.contrastText',
-                '&:hover': {
-                  bgcolor: 'primary.dark',
-                }
-              }}
-            >
-              <Psychology />
-            </IconButton>
-          </Tooltip>
-
-          {/* Dark Mode Toggle */}
-          <Tooltip title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
-            <IconButton color="inherit" onClick={toggleDarkMode}>
-              {isDarkMode ? <LightMode /> : <DarkMode />}
-            </IconButton>
-          </Tooltip>
+          {/* Theme Toggle */}
+          <IconButton onClick={toggleTheme} color="inherit">
+            {isDarkMode ? <LightMode /> : <DarkMode />}
+          </IconButton>
 
           {/* Notifications */}
-          <Tooltip title="Notifications">
-            <IconButton
-              color="inherit"
-              onClick={handleNotificationMenuOpen}
-            >
-              <Badge badgeContent={unreadCount} color="error">
-                <Notifications />
-              </Badge>
-            </IconButton>
-          </Tooltip>
+          <IconButton 
+            color="inherit" 
+            onClick={handleNotificationOpen}
+          >
+            <Badge badgeContent={3} color="error">
+              <Notifications />
+            </Badge>
+          </IconButton>
 
           {/* Profile Menu */}
-          <Tooltip title="Account">
-            <IconButton
-              onClick={handleProfileMenuOpen}
-              sx={{ ml: 1 }}
+          <IconButton
+            onClick={handleProfileMenuOpen}
+            sx={{ ml: 1 }}
+          >
+            <Avatar 
+              sx={{ 
+                width: 32, 
+                height: 32,
+                bgcolor: 'primary.main'
+              }}
             >
-              <Avatar
-                sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: 'primary.main',
-                  fontSize: '0.875rem'
-                }}
-              >
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
-              </Avatar>
-            </IconButton>
-          </Tooltip>
+              {user?.name?.charAt(0).toUpperCase() || 'U'}
+            </Avatar>
+          </IconButton>
         </Box>
 
         {/* Profile Menu */}
@@ -213,69 +142,36 @@ const Navbar: React.FC = () => {
           transformOrigin={{ horizontal: 'right', vertical: 'top' }}
           anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         >
-          {/* User Info */}
-          <MenuItem disabled>
+          <MenuItem>
             <Avatar sx={{ bgcolor: 'primary.main' }}>
-              {user?.name?.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0).toUpperCase() || 'U'}
             </Avatar>
             <Box>
-              <Typography variant="subtitle2">{user?.name}</Typography>
+              <Typography variant="subtitle2">{user?.name || 'User'}</Typography>
               <Typography variant="caption" color="text.secondary">
-                {user?.email}
+                {user?.email || 'user@orbit.ai'}
               </Typography>
             </Box>
           </MenuItem>
           
           <Divider />
-
-          {/* Theme Toggle */}
-          <MenuItem>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={isDarkMode}
-                  onChange={toggleDarkMode}
-                  size="small"
-                />
-              }
-              label="Dark Mode"
-              sx={{ m: 0 }}
-            />
-          </MenuItem>
-
-          <Divider />
-
-          {/* Menu Items */}
-          <MenuItem onClick={() => navigate('/profile')}>
-            <ListItemIcon>
-              <AccountCircle fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Profile</ListItemText>
-          </MenuItem>
-
-          <MenuItem onClick={handleSettings}>
+          
+          <MenuItem onClick={() => navigate('/settings')}>
             <ListItemIcon>
               <Settings fontSize="small" />
             </ListItemIcon>
             <ListItemText>Settings</ListItemText>
           </MenuItem>
-
-          <MenuItem onClick={() => toast.info('Help center coming soon!')}>
+          
+          <MenuItem>
             <ListItemIcon>
-              <Help fontSize="small" />
+              <AccountCircle fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Help</ListItemText>
+            <ListItemText>Profile</ListItemText>
           </MenuItem>
-
-          <MenuItem onClick={() => toast.info('Feedback form coming soon!')}>
-            <ListItemIcon>
-              <Feedback fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Feedback</ListItemText>
-          </MenuItem>
-
+          
           <Divider />
-
+          
           <MenuItem onClick={handleLogout}>
             <ListItemIcon>
               <Logout fontSize="small" />
@@ -288,39 +184,24 @@ const Navbar: React.FC = () => {
         <Menu
           anchorEl={notificationAnchor}
           open={Boolean(notificationAnchor)}
-          onClose={handleNotificationMenuClose}
+          onClose={handleNotificationClose}
           PaperProps={{
             elevation: 3,
             sx: {
               mt: 1.5,
-              maxWidth: 360,
-              maxHeight: 400,
+              maxWidth: 350,
+              minWidth: 300,
             },
           }}
           transformOrigin={{ horizontal: 'right', vertical: 'top' }}
           anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         >
-          <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
             <Typography variant="h6">Notifications</Typography>
-            {unreadCount > 0 && (
-              <Typography variant="caption" color="primary">
-                {unreadCount} unread
-              </Typography>
-            )}
           </Box>
-
+          
           {mockNotifications.map((notification) => (
-            <MenuItem
-              key={notification.id}
-              onClick={handleNotificationMenuClose}
-              sx={{
-                py: 1.5,
-                px: 2,
-                borderLeft: notification.unread ? 3 : 0,
-                borderColor: 'primary.main',
-                bgcolor: notification.unread ? 'action.hover' : 'transparent'
-              }}
-            >
+            <MenuItem key={notification.id} onClick={handleNotificationClose}>
               <Box sx={{ width: '100%' }}>
                 <Typography variant="subtitle2" gutterBottom>
                   {notification.title}
@@ -334,17 +215,10 @@ const Navbar: React.FC = () => {
               </Box>
             </MenuItem>
           ))}
-
-          <Divider />
           
-          <MenuItem
-            onClick={() => {
-              handleNotificationMenuClose();
-              toast.info('Notification settings coming soon!');
-            }}
-            sx={{ justifyContent: 'center' }}
-          >
-            <Typography variant="body2" color="primary">
+          <Divider />
+          <MenuItem onClick={handleNotificationClose}>
+            <Typography variant="body2" color="primary" sx={{ width: '100%', textAlign: 'center' }}>
               View All Notifications
             </Typography>
           </MenuItem>
