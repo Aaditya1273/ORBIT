@@ -1,450 +1,320 @@
 """
-ORBIT FastAPI Application
-World-class API for the autonomous life optimization platform
+ORBIT API Routes
+FastAPI router with all API endpoints
 """
 
-import asyncio
-import time
-from contextlib import asynccontextmanager
-from typing import Dict, Any, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.security import HTTPBearer
+from typing import List, Dict, Any
+import uuid
+from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
-import uvicorn
-import structlog
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-
-from ..core.config import settings
-from ..agents.base_agent import AgentOrchestrator, AgentContext
+from .schemas import (
+    GoalCreate, GoalResponse, InterventionRequest, InterventionResponse,
+    UserCreate, UserResponse, EvaluationResponse
+)
 from ..agents.worker_agent import WorkerAgent
 from ..agents.supervisor_agent import SupervisorAgent
+from ..agents.base_agent import AgentContext
+from ..core.redis import cache, session_manager
 from ..database.models import User, Goal, Intervention
-from ..database.database import get_db
-from .routers import auth, goals, interventions, analytics, integrations
-from .middleware import RateLimitMiddleware, AuthenticationMiddleware
-from .schemas import *
 
-# Configure logging
-logger = structlog.get_logger(__name__)
+# Create API router
+app = APIRouter()
 
-# Prometheus metrics
-REQUEST_COUNT = Counter('orbit_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
-REQUEST_DURATION = Histogram('orbit_request_duration_seconds', 'Request duration')
-INTERVENTION_COUNT = Counter('orbit_interventions_total', 'Total interventions', ['type', 'domain'])
-AGENT_EXECUTION_TIME = Histogram('orbit_agent_execution_seconds', 'Agent execution time', ['agent_type'])
+# Security
+security = HTTPBearer()
 
-# Global agent orchestrator
-orchestrator = AgentOrchestrator()
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan management"""
-    # Startup
-    logger.info("Starting ORBIT API server", version=settings.APP_VERSION)
-    
-    # Initialize agents
-    worker_agent = WorkerAgent()
-    supervisor_agent = SupervisorAgent()
-    
-    orchestrator.register_agent("worker", worker_agent)
-    orchestrator.register_agent("supervisor", supervisor_agent)
-    
-    # Health check all agents
-    health_results = await orchestrator.health_check_all()
-    logger.info("Agent health check completed", results=health_results)
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down ORBIT API server")
-
-
-# Create FastAPI app
-app = FastAPI(
-    title="ORBIT API",
-    description="Autonomous Life Optimization Platform",
-    version=settings.APP_VERSION,
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
-    lifespan=lifespan
-)
-
-# Add middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"] if settings.DEBUG else ["https://orbit.ai", "https://app.orbit.ai"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["*"] if settings.DEBUG else ["orbit.ai", "api.orbit.ai", "localhost"]
-)
-
-app.add_middleware(RateLimitMiddleware)
-app.add_middleware(AuthenticationMiddleware)
-
-# Include routers
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["authentication"])
-app.include_router(goals.router, prefix="/api/v1/goals", tags=["goals"])
-app.include_router(interventions.router, prefix="/api/v1/interventions", tags=["interventions"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
-app.include_router(integrations.router, prefix="/api/v1/integrations", tags=["integrations"])
-
-
-@app.middleware("http")
-async def metrics_middleware(request: Request, call_next):
-    """Collect metrics for all requests"""
-    start_time = time.time()
-    
-    response = await call_next(request)
-    
-    # Record metrics
-    duration = time.time() - start_time
-    REQUEST_COUNT.labels(
-        method=request.method,
-        endpoint=request.url.path,
-        status=response.status_code
-    ).inc()
-    REQUEST_DURATION.observe(duration)
-    
-    return response
-
+# Initialize agents
+worker_agent = WorkerAgent()
+supervisor_agent = SupervisorAgent()
 
 @app.get("/")
-async def root():
-    """Root endpoint with API information"""
+async def api_root():
+    """API root endpoint"""
     return {
         "name": "ORBIT API",
-        "version": settings.APP_VERSION,
-        "description": "Autonomous Life Optimization Platform",
-        "status": "operational",
-        "docs": "/docs" if settings.DEBUG else None
+        "version": "1.0.0",
+        "description": "Autonomous Life Optimization Platform API",
+        "endpoints": {
+            "health": "/health",
+            "goals": "/goals",
+            "interventions": "/interventions",
+            "users": "/users"
+        }
     }
 
-
 @app.get("/health")
-async def health_check():
-    """Comprehensive health check endpoint"""
+async def api_health():
+    """API health check"""
     try:
-        # Check agent health
-        agent_health = await orchestrator.health_check_all()
+        # Test agent health
+        worker_health = await worker_agent.health_check()
+        supervisor_health = await supervisor_agent.health_check()
         
-        # Check database connectivity
-        # db_health = await check_database_health()
-        
-        # Check external services
-        # external_health = await check_external_services()
-        
-        health_status = {
+        return {
             "status": "healthy",
-            "timestamp": time.time(),
-            "version": settings.APP_VERSION,
-            "agents": agent_health,
-            # "database": db_health,
-            # "external_services": external_health
+            "agents": {
+                "worker": worker_health,
+                "supervisor": supervisor_health
+            },
+            "timestamp": datetime.utcnow().isoformat()
         }
-        
-        return health_status
-        
     except Exception as e:
-        logger.error("Health check failed", error=str(e))
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
-
-@app.get("/metrics")
-async def metrics():
-    """Prometheus metrics endpoint"""
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-
-
-@app.post("/api/v1/interventions/generate")
+@app.post("/interventions/generate", response_model=InterventionResponse)
 async def generate_intervention(
     request: InterventionRequest,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user)
+    background_tasks: BackgroundTasks
 ):
-    """
-    Generate a personalized intervention using the agent orchestrator
-    """
+    """Generate AI intervention for user goal"""
     try:
-        start_time = time.time()
-        
-        # Build agent context
+        # Create agent context
         context = AgentContext(
-            user_id=str(current_user.id),
-            session_id=request.session_id,
-            current_goals=request.current_goals,
-            user_state=request.user_state,
-            recent_history=request.recent_history,
-            external_context=request.external_context
+            user_id=request.user_id,
+            session_id=str(uuid.uuid4()),
+            current_goals=request.goals,
+            user_state=request.user_state or {},
+            recent_history=request.recent_history or [],
+            external_context=request.external_context or {}
         )
         
-        # Execute intervention pipeline
-        results = await orchestrator.execute_workflow(
-            workflow_name="intervention_pipeline",
+        # Generate intervention with Worker Agent
+        worker_response = await worker_agent.execute(
             context=context,
-            user_input=request.user_input,
-            urgency=request.urgency,
-            domain=request.domain
+            user_input=request.user_input
         )
         
-        # Extract results
-        worker_response = results.get("worker")
-        supervisor_evaluation = results.get("supervisor")
-        
-        if not worker_response:
-            raise HTTPException(status_code=500, detail="Worker agent failed to generate intervention")
-        
-        # Record metrics
-        execution_time = time.time() - start_time
-        AGENT_EXECUTION_TIME.labels(agent_type="intervention_pipeline").observe(execution_time)
-        INTERVENTION_COUNT.labels(
-            type=request.trigger_type,
-            domain=request.domain
-        ).inc()
-        
-        # Store intervention in database (background task)
-        background_tasks.add_task(
-            store_intervention,
-            current_user.id,
-            worker_response,
-            supervisor_evaluation
+        # Evaluate with Supervisor Agent
+        supervisor_response = await supervisor_agent.execute(
+            context=context,
+            user_input=worker_response.content
         )
         
-        # Return response
-        response = InterventionResponse(
-            intervention_id=f"int_{int(time.time())}",
+        # Cache the intervention
+        intervention_id = str(uuid.uuid4())
+        await cache.set(
+            f"intervention:{intervention_id}",
+            {
+                "worker_response": worker_response.to_dict(),
+                "supervisor_response": supervisor_response.to_dict(),
+                "context": request.dict(),
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            expire=3600  # 1 hour
+        )
+        
+        return InterventionResponse(
+            id=intervention_id,
             content=worker_response.content,
             reasoning=worker_response.reasoning,
             confidence=worker_response.confidence,
-            supervisor_evaluation=supervisor_evaluation.to_dict() if supervisor_evaluation else None,
-            metadata=worker_response.metadata,
-            execution_time_ms=worker_response.execution_time_ms
+            evaluation=EvaluationResponse(
+                safety_score=supervisor_response.metadata.get("safety_score", 0.8),
+                relevance_score=supervisor_response.metadata.get("relevance_score", 0.8),
+                accuracy_score=supervisor_response.metadata.get("accuracy_score", 0.8),
+                success_probability=supervisor_response.metadata.get("success_probability", 0.7),
+                engagement_quality=supervisor_response.metadata.get("engagement_quality", 0.8),
+                overall_score=supervisor_response.confidence,
+                reasoning=supervisor_response.reasoning
+            ),
+            metadata={
+                "worker_model": worker_response.model_used,
+                "supervisor_model": supervisor_response.model_used,
+                "execution_time_ms": worker_response.execution_time_ms + supervisor_response.execution_time_ms,
+                "timestamp": datetime.utcnow().isoformat()
+            }
         )
-        
-        logger.info(
-            "Intervention generated successfully",
-            user_id=current_user.id,
-            domain=request.domain,
-            confidence=worker_response.confidence,
-            execution_time_ms=worker_response.execution_time_ms
-        )
-        
-        return response
         
     except Exception as e:
-        logger.error(
-            "Intervention generation failed",
-            user_id=current_user.id,
-            error=str(e),
-            exc_info=True
-        )
-        raise HTTPException(status_code=500, detail=f"Failed to generate intervention: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Intervention generation failed: {str(e)}")
 
+@app.get("/interventions/{intervention_id}")
+async def get_intervention(intervention_id: str):
+    """Get cached intervention by ID"""
+    intervention = await cache.get(f"intervention:{intervention_id}")
+    
+    if not intervention:
+        raise HTTPException(status_code=404, detail="Intervention not found")
+    
+    return intervention
 
-@app.post("/api/v1/interventions/{intervention_id}/feedback")
-async def submit_intervention_feedback(
-    intervention_id: str,
-    feedback: InterventionFeedback,
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Submit feedback on an intervention for learning
-    """
+@app.post("/goals", response_model=GoalResponse)
+async def create_goal(goal: GoalCreate):
+    """Create a new user goal"""
     try:
-        # Store feedback for optimizer agent
-        await store_intervention_feedback(
-            intervention_id=intervention_id,
-            user_id=current_user.id,
-            feedback=feedback
-        )
-        
-        logger.info(
-            "Intervention feedback received",
-            intervention_id=intervention_id,
-            user_id=current_user.id,
-            complied=feedback.complied,
-            rating=feedback.rating
-        )
-        
-        return {"status": "success", "message": "Feedback recorded"}
-        
-    except Exception as e:
-        logger.error(
-            "Failed to store intervention feedback",
-            intervention_id=intervention_id,
-            error=str(e)
-        )
-        raise HTTPException(status_code=500, detail="Failed to record feedback")
-
-
-@app.get("/api/v1/users/me/patterns")
-async def get_user_patterns(
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Get user's behavioral patterns and insights
-    """
-    try:
-        # This would typically fetch from cache or database
-        # For now, return mock data
-        patterns = {
-            "user_id": str(current_user.id),
-            "analysis_timestamp": time.time(),
-            "confidence": 0.85,
-            "insights": [
-                {
-                    "type": "optimal_timing",
-                    "insight": "You're most productive between 9-11 AM and 2-4 PM",
-                    "confidence": 0.9,
-                    "actionable": True
-                },
-                {
-                    "type": "compliance_success",
-                    "insight": "Your compliance rate is 78% - excellent progress!",
-                    "confidence": 0.85,
-                    "actionable": True
-                }
-            ],
-            "recommendations": [
-                "Schedule important tasks during your peak hours",
-                "Continue your current approach - it's working well"
-            ]
+        goal_id = str(uuid.uuid4())
+        goal_data = {
+            "id": goal_id,
+            "title": goal.title,
+            "description": goal.description,
+            "domain": goal.domain,
+            "target_value": goal.target_value,
+            "current_value": goal.current_value,
+            "unit": goal.unit,
+            "deadline": goal.deadline.isoformat() if goal.deadline else None,
+            "priority": goal.priority,
+            "status": "active",
+            "created_at": datetime.utcnow().isoformat()
         }
         
-        return patterns
+        # Cache the goal
+        await cache.set(f"goal:{goal_id}", goal_data, expire=86400)  # 24 hours
+        
+        return GoalResponse(**goal_data)
         
     except Exception as e:
-        logger.error(
-            "Failed to get user patterns",
-            user_id=current_user.id,
-            error=str(e)
-        )
-        raise HTTPException(status_code=500, detail="Failed to retrieve patterns")
+        raise HTTPException(status_code=500, detail=f"Goal creation failed: {str(e)}")
 
-
-@app.get("/api/v1/dashboard")
-async def get_dashboard_data(
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Get comprehensive dashboard data for the user
-    """
+@app.get("/goals", response_model=List[GoalResponse])
+async def list_goals(user_id: str):
+    """List all goals for a user"""
     try:
-        # This would aggregate data from multiple sources
-        dashboard_data = {
-            "user": {
-                "id": str(current_user.id),
-                "name": current_user.name,
-                "streak_days": 14,
-                "total_goals": 5,
-                "active_goals": 3
-            },
-            "today_focus": "Financial discipline",
-            "energy_level": "7/10",
-            "ai_reliability": {
-                "interventions_this_week": 47,
-                "helpful_percentage": 89,
-                "safety_score": 0.97,
-                "relevance_score": 0.89,
-                "accuracy_score": 0.82
-            },
-            "goals": [
-                {
-                    "id": "goal_1",
-                    "title": "Exercise 3x/week",
-                    "domain": "health",
-                    "progress": 78,
-                    "next_action": "Tomorrow 7 AM workout",
-                    "ai_insight": "You exercise best in mornings ☀️"
-                },
-                {
-                    "id": "goal_2",
-                    "title": "Save $500/month",
-                    "domain": "finance",
-                    "progress": 82,
-                    "next_action": "Review budget",
-                    "ai_insight": "Big purchase temptation detected ⚠️"
-                }
-            ],
-            "todays_plan": [
-                {"time": "7:00 AM", "action": "☕ Review budget before coffee shop"},
-                {"time": "9:30 AM", "action": "💼 Deep work block (3 hrs)"},
-                {"time": "12:30 PM", "action": "🥗 Meal prep reminder"},
-                {"time": "3:00 PM", "action": "🧘 Meditation break"},
-                {"time": "6:00 PM", "action": "🏃 Workout: 30-min run"},
-                {"time": "10:00 PM", "action": "🌙 Wind-down routine"}
-            ]
+        # In a real implementation, this would query the database
+        # For now, return cached goals
+        goal_keys = await cache.list_keys(f"goal:*")
+        goals = []
+        
+        for key in goal_keys:
+            goal_data = await cache.get(key)
+            if goal_data:
+                goals.append(GoalResponse(**goal_data))
+        
+        return goals
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list goals: {str(e)}")
+
+@app.post("/users", response_model=UserResponse)
+async def create_user(user: UserCreate):
+    """Create a new user"""
+    try:
+        user_id = str(uuid.uuid4())
+        user_data = {
+            "id": user_id,
+            "email": user.email,
+            "name": user.name,
+            "preferences": user.preferences or {},
+            "created_at": datetime.utcnow().isoformat(),
+            "is_active": True
         }
         
-        return dashboard_data
+        # Cache user data
+        await cache.set(f"user:{user_id}", user_data, expire=86400)
         
-    except Exception as e:
-        logger.error(
-            "Failed to get dashboard data",
-            user_id=current_user.id,
-            error=str(e)
-        )
-        raise HTTPException(status_code=500, detail="Failed to retrieve dashboard data")
-
-
-# Background tasks
-async def store_intervention(
-    user_id: int,
-    worker_response: Any,
-    supervisor_evaluation: Any
-):
-    """Store intervention in database"""
-    try:
-        # This would store in the database
-        logger.info(
-            "Intervention stored",
+        # Create session
+        session_id = await session_manager.create_session(
             user_id=user_id,
-            confidence=worker_response.confidence
+            session_data={"user_id": user_id, "email": user.email}
         )
+        
+        user_data["session_id"] = session_id
+        return UserResponse(**user_data)
+        
     except Exception as e:
-        logger.error(f"Failed to store intervention: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"User creation failed: {str(e)}")
 
+@app.get("/users/{user_id}", response_model=UserResponse)
+async def get_user(user_id: str):
+    """Get user by ID"""
+    user_data = await cache.get(f"user:{user_id}")
+    
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return UserResponse(**user_data)
 
-async def store_intervention_feedback(
-    intervention_id: str,
-    user_id: int,
-    feedback: Any
-):
-    """Store intervention feedback for learning"""
+@app.get("/test/openrouter")
+async def test_openrouter():
+    """Test OpenRouter integration"""
     try:
-        # This would store feedback in database for optimizer agent
-        logger.info(
-            "Feedback stored",
-            intervention_id=intervention_id,
-            user_id=user_id
+        # Simple test of both agents
+        context = AgentContext(
+            user_id="test_user",
+            session_id="test_session",
+            current_goals=[{
+                "title": "Test Goal",
+                "domain": "productivity",
+                "progress": 0.5
+            }],
+            user_state={"test": True},
+            recent_history=[]
         )
+        
+        # Test Worker Agent (Gemini)
+        worker_response = await worker_agent.execute(
+            context=context,
+            user_input="Generate a simple productivity tip"
+        )
+        
+        # Test Supervisor Agent (Claude via OpenRouter)
+        supervisor_response = await supervisor_agent.execute(
+            context=context,
+            user_input=worker_response.content
+        )
+        
+        return {
+            "status": "success",
+            "worker_agent": {
+                "model": worker_response.model_used,
+                "response": worker_response.content[:100] + "...",
+                "confidence": worker_response.confidence,
+                "execution_time_ms": worker_response.execution_time_ms
+            },
+            "supervisor_agent": {
+                "model": supervisor_response.model_used,
+                "response": supervisor_response.content[:100] + "...",
+                "confidence": supervisor_response.confidence,
+                "execution_time_ms": supervisor_response.execution_time_ms
+            },
+            "total_time_ms": worker_response.execution_time_ms + supervisor_response.execution_time_ms
+        }
+        
     except Exception as e:
-        logger.error(f"Failed to store feedback: {str(e)}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "OpenRouter integration test failed"
+        }
 
-
-# Dependency functions
-async def get_current_user() -> User:
-    """Get current authenticated user"""
-    # Mock user for now
-    return User(
-        id=1,
-        name="Alex Johnson",
-        email="alex@example.com"
-    )
-
-
-if __name__ == "__main__":
-    uvicorn.run(
-        "src.api.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-        log_level=settings.LOG_LEVEL.lower()
-    )
+@app.get("/test/redis")
+async def test_redis():
+    """Test Redis connection and operations"""
+    try:
+        # Test basic operations
+        test_key = f"test:{uuid.uuid4()}"
+        test_value = {"message": "Redis test", "timestamp": datetime.utcnow().isoformat()}
+        
+        # Set value
+        await cache.set(test_key, test_value, expire=60)
+        
+        # Get value
+        retrieved_value = await cache.get(test_key)
+        
+        # Delete value
+        await cache.delete(test_key)
+        
+        return {
+            "status": "success",
+            "operations": {
+                "set": "success",
+                "get": "success" if retrieved_value == test_value else "failed",
+                "delete": "success"
+            },
+            "test_data": {
+                "original": test_value,
+                "retrieved": retrieved_value
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Redis test failed"
+        }

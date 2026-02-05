@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     # Evaluation & Monitoring
     OPIK_API_KEY: str
     OPIK_PROJECT_NAME: str = "orbit-production"
+    OPIK_WORKSPACE: str = "orbit-workspace"
     LANGFUSE_SECRET_KEY: Optional[str] = None
     LANGFUSE_PUBLIC_KEY: Optional[str] = None
     WANDB_API_KEY: Optional[str] = None
