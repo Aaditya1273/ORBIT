@@ -28,9 +28,10 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: Optional[str] = None
     
     # AI Models
-    OPENAI_API_KEY: str
-    ANTHROPIC_API_KEY: str
-    GEMINI_API_KEY: str
+    OPENAI_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+    GOOGLE_API_KEY: str  # Gemini API key
+    OPEN_ROUTER_API_KEY: str  # OpenRouter for cost-effective model access
     
     # Evaluation & Monitoring
     OPIK_API_KEY: str
@@ -115,23 +116,37 @@ settings = get_settings()
 
 # Model configurations
 MODEL_CONFIGS = {
-    "gemini-1.5-pro": {
+    "worker": {
+        "model": "google/gemini-1.5-pro",  # Using Gemini directly
         "provider": "google",
         "max_tokens": 8192,
         "temperature": 0.7,
         "top_p": 0.9,
+        "system_prompt": ""
     },
-    "claude-3-sonnet-20240229": {
-        "provider": "anthropic",
+    "supervisor": {
+        "model": "anthropic/claude-3-sonnet-20240229",  # Using Claude via OpenRouter
+        "provider": "openrouter",
         "max_tokens": 4096,
         "temperature": 0.3,
         "top_p": 0.9,
+        "system_prompt": ""
     },
-    "gpt-4-turbo-preview": {
-        "provider": "openai",
+    "optimizer": {
+        "model": "openai/gpt-4-turbo-preview",  # Using GPT-4 via OpenRouter
+        "provider": "openrouter",
         "max_tokens": 4096,
+        "temperature": 0.5,
+        "top_p": 0.9,
+        "system_prompt": ""
+    },
+    "fallback": {
+        "model": "meta-llama/llama-3.1-8b-instruct:free",  # Free fallback model
+        "provider": "openrouter",
+        "max_tokens": 2048,
         "temperature": 0.7,
         "top_p": 0.9,
+        "system_prompt": ""
     }
 }
 

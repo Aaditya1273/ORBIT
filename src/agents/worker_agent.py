@@ -28,14 +28,21 @@ class WorkerAgent(BaseAgent):
     """
     
     def __init__(self, model_config: Optional[Dict[str, Any]] = None):
+        # Use the worker model configuration from settings
+        worker_config = MODEL_CONFIGS.get("worker", {
+            "model": "google/gemini-1.5-pro",
+            "provider": "google",
+            "temperature": 0.7,
+            "max_tokens": 4000,
+            "system_prompt": self._build_system_prompt()
+        })
+        
+        if model_config:
+            worker_config.update(model_config)
+        
         super().__init__(
             agent_type="worker",
-            model_config=model_config or {
-                "model": settings.DEFAULT_WORKER_MODEL,
-                "temperature": 0.7,
-                "max_tokens": 4000,
-                "system_prompt": self._build_system_prompt()
-            }
+            model_config=worker_config
         )
     
     def _build_system_prompt(self) -> str:

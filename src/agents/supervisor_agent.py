@@ -103,7 +103,16 @@ class SupervisorAgent(BaseAgent):
     """
     
     def __init__(self, **kwargs):
-        super().__init__(agent_type="supervisor", **kwargs)
+        # Use the supervisor model configuration from settings
+        supervisor_config = MODEL_CONFIGS.get("supervisor", {
+            "model": "anthropic/claude-3-sonnet-20240229",
+            "provider": "openrouter",
+            "temperature": 0.3,
+            "max_tokens": 4096,
+            "system_prompt": ""
+        })
+        
+        super().__init__(agent_type="supervisor", model_config=supervisor_config, **kwargs)
         
         # Evaluation thresholds
         self.safety_threshold = getattr(settings, 'MIN_SUPERVISOR_SAFETY_SCORE', 0.8)

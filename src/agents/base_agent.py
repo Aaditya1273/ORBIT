@@ -14,11 +14,12 @@ import uuid
 
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 import opik
 from opik import track, opik_context
 import structlog
+import httpx
+import json
 
 from ..core.config import settings, MODEL_CONFIGS
 
@@ -93,33 +94,35 @@ class BaseAgent(ABC):
     
     def _initialize_llm(self):
         """Initialize the appropriate LLM based on model configuration"""
-        model_name = self.model_config.get("model", "gpt-4-turbo")
+        model_config = self.model_config
+        provider = model_config.get("provider", "openrouter")
+        model_name = model_config.get("model", "meta-llama/llama-3.1-8b-instruct:free")
         
-        if model_name.startswith("gpt-"):
-            return ChatOpenAI(
-                model=model_name,
-                temperature=self.model_config.get("temperature", 0.7),
-                max_tokens=self.model_config.get("max_tokens", 2048),
-                openai_api_key=settings.OPENAI_API_KEY,
-                request_timeout=settings.REQUEST_TIMEOUT,
-            )
-        elif model_name.startswith("claude-"):
-            return ChatAnthropic(
-                model=model_name,
-                temperature=self.model_config.get("temperature", 0.7),
-                max_tokens=self.model_config.get("max_tokens", 2048),
-                anthropic_api_key=settings.ANTHROPIC_API_KEY,
-                timeout=settings.REQUEST_TIMEOUT,
-            )
-        elif model_name.startswith("gemini-"):
+        if provider == "google":
+            # Use Google Gemini directly
             return ChatGoogleGenerativeAI(
-                model=model_name,
-                temperature=self.model_config.get("temperature", 0.7),
-                max_output_tokens=self.model_config.get("max_tokens", 2048),
+                model=model_name.split("/")[-1],  # Extract model name
+                temperature=model_config.get("temperature", 0.7),
+                max_output_tokens=model_config.get("max_tokens", 2048),
                 google_api_key=settings.GOOGLE_API_KEY,
             )
+        elif provider == "openrouter":
+            # Use OpenRouter for cost-effective access to multiple models
+            return OpenRouterLLM(
+                model=model_name,
+                temperature=model_config.get("temperature", 0.7),
+                max_tokens=model_config.get("max_tokens", 2048),
+                api_key=settings.OPEN_ROUTER_API_KEY,
+            )
         else:
-            raise ValueError(f"Unsupported model: {model_name}")
+            # Fallback to OpenRouter with free model
+            logger.warning(f"Unknown provider {provider}, falling back to OpenRouter")
+            return OpenRouterLLM(
+                model="meta-llama/llama-3.1-8b-instruct:free",
+                temperature=0.7,
+                max_tokens=2048,
+                api_key=settings.OPEN_ROUTER_API_KEY,
+            )
     
     @track(name="agent_execution")
     async def execute(
@@ -493,3 +496,121 @@ class AgentOrchestrator:
         
         for agent_type, agent in self.agents.items():
             health_results[agent_ty
+
+
+class OpenRouterLLM:
+    """
+    Custom LLM wrapper for OpenRouter API
+    Provides cost-effective access to multiple AI models
+    """
+    
+    def __init__(self, model: str, temperature: float = 0.7, max_tokens: int = 2048, api_key: str = None):
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.api_key = api_key or settings.OPEN_ROUTER_API_KEY
+        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        
+        if not self.api_key:
+            raise ValueError("OpenRouter API key is required")
+    
+    async def ainvoke(self, messages: List[BaseMessage], **kwargs) -> Any:
+        """
+        Async invoke method compatible with LangChain interface
+        """
+        # Convert LangChain messages to OpenRouter format
+        openrouter_messages = []
+        
+        for message in messages:
+            if isinstance(message, SystemMessage):
+                openrouter_messages.append({
+                    "role": "system",
+                    "content": message.content
+                })
+            elif isinstance(message, HumanMessage):
+                openrouter_messages.append({
+                    "role": "user", 
+                    "content": message.content
+                })
+            elif isinstance(message, AIMessage):
+                openrouter_messages.append({
+                    "role": "assistant",
+                    "content": message.content
+                })
+        
+        # Prepare request payload
+        payload = {
+            "model": self.model,
+            "messages": openrouter_messages,
+            "temperature": kwargs.get("temperature", self.temperature),
+            "max_tokens": kwargs.get("max_tokens", self.max_tokens),
+            "top_p": kwargs.get("top_p", 0.9),
+            "stream": False
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://orbit.ai",  # Optional: for analytics
+            "X-Title": "ORBIT AI Platform"  # Optional: for analytics
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.base_url,
+                    json=payload,
+                    headers=headers
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                # Extract response content
+                content = result["choices"][0]["message"]["content"]
+                
+                # Extract usage information
+                usage = result.get("usage", {})
+                
+                # Create response object compatible with LangChain
+                class OpenRouterResponse:
+                    def __init__(self, content: str, usage: dict):
+                        self.content = content
+                        self.response_metadata = {
+                            "usage": {
+                                "prompt_tokens": usage.get("prompt_tokens", 0),
+                                "completion_tokens": usage.get("completion_tokens", 0),
+                                "total_tokens": usage.get("total_tokens", 0)
+                            },
+                            "model": self.model,
+                            "provider": "openrouter"
+                        }
+                
+                return OpenRouterResponse(content, usage)
+                
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OpenRouter API error: {e.response.status_code} - {e.response.text}")
+            
+            # Fallback to free model if paid model fails
+            if self.model != "meta-llama/llama-3.1-8b-instruct:free":
+                logger.info("Falling back to free model")
+                fallback_llm = OpenRouterLLM(
+                    model="meta-llama/llama-3.1-8b-instruct:free",
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                    api_key=self.api_key
+                )
+                return await fallback_llm.ainvoke(messages, **kwargs)
+            
+            raise Exception(f"OpenRouter API error: {e.response.status_code}")
+            
+        except Exception as e:
+            logger.error(f"OpenRouter request failed: {str(e)}")
+            raise Exception(f"OpenRouter request failed: {str(e)}")
+    
+    def invoke(self, messages: List[BaseMessage], **kwargs) -> Any:
+        """
+        Sync invoke method (wrapper around async)
+        """
+        import asyncio
+        return asyncio.run(self.ainvoke(messages, **kwargs))

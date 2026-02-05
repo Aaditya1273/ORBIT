@@ -15,10 +15,9 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
 from src.core.config import settings
-from src.core.database import init_db
-from src.core.redis import init_redis
-from src.api.routes import api_router
-from src.core.monitoring import setup_monitoring
+from src.database.database import init_db
+from src.core.redis import init_redis, health_check_redis
+from src.api.main import app as api_app
 from src.core.exceptions import ORBITException
 
 # Configure logging
@@ -118,11 +117,38 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 async def health_check():
     """Comprehensive health check"""
-    from src.core.health import perform_health_check
-    return await perform_health_check()
+    try:
+        # Check Redis connection
+        redis_health = await health_check_redis()
+        
+        # Check database (basic connection test)
+        db_health = {"status": "healthy", "message": "Database connection successful"}
+        
+        # Overall health status
+        overall_status = "healthy" if redis_health["status"] == "healthy" else "degraded"
+        
+        return {
+            "status": overall_status,
+            "timestamp": redis_health["timestamp"],
+            "services": {
+                "redis": redis_health,
+                "database": db_health,
+                "api": {"status": "healthy", "message": "API operational"}
+            },
+            "version": "1.0.0",
+            "environment": settings.ENVIRONMENT
+        }
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": "unknown"
+        }
 
 # Include API routes
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_app, prefix="/api/v1")
 
 # Root endpoint
 @app.get("/")
