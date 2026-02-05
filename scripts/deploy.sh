@@ -255,4 +255,37 @@ main() {
     log "n8n workflows: https://your-domain.com:5678"
 }
 
-# Handle sc
+# Handle script arguments
+case "${1:-deploy}" in
+    "deploy")
+        main
+        ;;
+    "rollback")
+        rollback
+        ;;
+    "backup")
+        create_backup
+        ;;
+    "monitor")
+        monitor
+        ;;
+    "cleanup")
+        cleanup_backups
+        ;;
+    *)
+        echo "Usage: $0 {deploy|rollback|backup|monitor|cleanup} [image_tag] [environment]"
+        echo ""
+        echo "Commands:"
+        echo "  deploy    - Deploy the application (default)"
+        echo "  rollback  - Rollback to previous version"
+        echo "  backup    - Create backup only"
+        echo "  monitor   - Monitor current deployment"
+        echo "  cleanup   - Clean up old backups"
+        echo ""
+        echo "Examples:"
+        echo "  $0 deploy v1.2.3 production"
+        echo "  $0 rollback"
+        echo "  $0 backup"
+        exit 1
+        ;;
+esac

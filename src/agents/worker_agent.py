@@ -1,226 +1,226 @@
 """
-ORBIT Worker Agent - The Primary AI Coach
-World-class behavioral intervention generation with cross-domain optimization
+ORBIT Worker Agent
+Generates personalized interventions, daily plans, and behavioral nudges
 """
 
 import json
-import asyncio
-from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
-from dataclasses import dataclass
-
-from langchain.schema import HumanMessage, SystemMessage
-import structlog
+from typing import Dict, Any, List, Optional
+from langchain.schema import SystemMessage, HumanMessage
 
 from .base_agent import BaseAgent, AgentResponse, AgentContext
-from ..core.config import settings, BEHAVIORAL_CONSTANTS, DOMAIN_CONFIGS
-from ..behavioral_science.intervention_engine import InterventionEngine
-from ..behavioral_science.pattern_analyzer import PatternAnalyzer
-
+from ..core.config import settings, DOMAIN_CONFIGS
+from ..models.intervention import InterventionType
+import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-@dataclass
-class InterventionRequest:
-    """Structured request for intervention generation"""
-    trigger_type: str  # "scheduled", "reactive", "predictive"
-    domain: str  # "health", "finance", "productivity", etc.
-    urgency: str  # "low", "medium", "high", "critical"
-    context_data: Dict[str, Any]
-    user_state: Dict[str, Any]
-    goal_progress: Dict[str, Any]
-
-
 class WorkerAgent(BaseAgent):
     """
-    The Worker Agent is ORBIT's primary AI coach responsible for:
-    1. Generating personalized behavioral interventions
-    2. Cross-domain goal optimization
-    3. Predictive failure prevention
-    4. Adaptive difficulty scaling
-    5. Context-aware timing
+    Worker Agent: The creative force behind ORBIT's interventions
+    
+    Responsibilities:
+    - Generate personalized daily plans
+    - Create contextual interventions and nudges
+    - Adapt strategies based on user patterns
+    - Provide cross-domain optimization suggestions
     """
     
-    def __init__(self, **kwargs):
-        super().__init__(agent_type="worker", **kwargs)
-        
-        # Initialize behavioral science engines
-        self.intervention_engine = InterventionEngine()
-        self.pattern_analyzer = PatternAnalyzer()
-        
-        # Cache for user patterns and preferences
-        self.user_patterns_cache = {}
-        self.intervention_history = {}
-        
-        logger.info("Worker Agent initialized with behavioral science engines")
+    def __init__(self, model_config: Optional[Dict[str, Any]] = None):
+        super().__init__(
+            agent_type="worker",
+            model_config=model_config or {
+                "model": settings.DEFAULT_WORKER_MODEL,
+                "temperature": 0.7,
+                "max_tokens": 4000,
+                "system_prompt": self._build_system_prompt()
+            }
+        )
+    
+    def _build_system_prompt(self) -> str:
+        """Build the comprehensive system prompt for the Worker Agent"""
+        return """You are the Worker Agent in ORBIT, an autonomous life optimization platform.
+
+CORE MISSION:
+Generate personalized, actionable interventions that help users achieve their goals through behavioral science-backed strategies.
+
+BEHAVIORAL SCIENCE PRINCIPLES:
+1. Implementation Intentions: Create specific "if-then" plans
+2. Habit Stacking: Link new behaviors to existing habits
+3. Temptation Bundling: Pair desired behaviors with enjoyable activities
+4. Social Proof: Reference what similar users have achieved
+5. Loss Aversion: Frame in terms of what they might lose
+6. Fresh Start Effect: Leverage natural reset points
+7. Friction Injection: Make bad habits harder, good habits easier
+
+INTERVENTION TYPES:
+- NUDGE: Gentle reminder or suggestion (low friction)
+- PLAN: Structured daily/weekly plan with specific actions
+- FRICTION: Introduce barriers to unwanted behaviors
+- REWARD: Celebrate achievements and milestones
+- PIVOT: Adjust strategy when current approach isn't working
+- SYNC: Cross-domain optimization suggestions
+
+RESPONSE FORMAT:
+Always respond with a JSON object containing:
+{
+  "intervention_type": "NUDGE|PLAN|FRICTION|REWARD|PIVOT|SYNC",
+  "domain": "health|finance|productivity|learning|social",
+  "title": "Brief, engaging title",
+  "content": "Main intervention content",
+  "reasoning": "Why this intervention now",
+  "behavioral_principle": "Which principle(s) you're applying",
+  "timing": "when|immediate|scheduled",
+  "expected_outcome": "What success looks like",
+  "fallback_strategy": "What to do if user doesn't engage",
+  "cross_domain_effects": ["potential impacts on other goals"],
+  "confidence": 0.0-1.0
+}
+
+PERSONALIZATION FACTORS:
+- User's historical compliance patterns
+- Current energy/motivation levels
+- Time of day and context
+- Recent successes and failures
+- Personality indicators (if available)
+- External factors (weather, calendar, etc.)
+
+SAFETY GUIDELINES:
+- Never suggest anything that could cause physical harm
+- Avoid financial advice beyond basic budgeting
+- Don't provide medical advice
+- Be sensitive to mental health considerations
+- Respect user boundaries and preferences
+
+QUALITY STANDARDS:
+- Be specific and actionable
+- Include clear success metrics
+- Provide fallback options
+- Consider timing and context
+- Explain your reasoning clearly
+"""
     
     async def _execute_internal(
         self,
         context: AgentContext,
         user_input: str,
+        intervention_type: Optional[str] = None,
+        domain: Optional[str] = None,
         **kwargs
     ) -> AgentResponse:
         """
-        Generate intelligent, personalized interventions based on context
+        Generate a personalized intervention based on context and input
         """
         try:
-            # Parse the request type
-            request = self._parse_intervention_request(user_input, context)
+            # Build comprehensive context prompt
+            context_prompt = self._build_intervention_context(context, user_input)
             
-            # Analyze user patterns
-            user_patterns = await self._analyze_user_patterns(context)
+            # Create messages for LLM
+            messages = [
+                SystemMessage(content=self.model_config["system_prompt"]),
+                HumanMessage(content=context_prompt)
+            ]
             
-            # Generate intervention based on type
-            if request.trigger_type == "scheduled":
-                intervention = await self._generate_scheduled_intervention(request, user_patterns, context)
-            elif request.trigger_type == "reactive":
-                intervention = await self._generate_reactive_intervention(request, user_patterns, context)
-            elif request.trigger_type == "predictive":
-                intervention = await self._generate_predictive_intervention(request, user_patterns, context)
-            else:
-                intervention = await self._generate_general_intervention(request, user_patterns, context)
+            # Call LLM
+            llm_response = await self._call_llm(messages)
             
-            # Apply cross-domain optimization
-            if settings.CROSS_DOMAIN_SYNC_ENABLED:
-                intervention = await self._apply_cross_domain_optimization(intervention, context)
+            # Parse the JSON response
+            try:
+                intervention_data = json.loads(llm_response["content"])
+            except json.JSONDecodeError:
+                # Fallback: extract JSON from response if it's embedded in text
+                intervention_data = self._extract_json_from_text(llm_response["content"])
             
-            # Calculate confidence based on multiple factors
-            confidence = self._calculate_intervention_confidence(intervention, user_patterns, context)
+            # Validate and enhance the intervention
+            validated_intervention = self._validate_intervention(intervention_data, context)
             
-            # Store intervention for learning
-            await self._store_intervention_for_learning(intervention, context)
+            # Calculate confidence based on context quality and user history
+            confidence = self._calculate_confidence(validated_intervention, context)
+            validated_intervention["confidence"] = confidence
             
             return AgentResponse(
-                content=intervention["content"],
-                reasoning=intervention["reasoning"],
+                content=json.dumps(validated_intervention, indent=2),
+                reasoning=validated_intervention.get("reasoning", "Generated personalized intervention"),
                 confidence=confidence,
                 metadata={
-                    "intervention_type": request.trigger_type,
-                    "domain": request.domain,
-                    "urgency": request.urgency,
-                    "cross_domain_effects": intervention.get("cross_domain_effects", []),
-                    "behavioral_techniques": intervention.get("techniques", []),
-                    "expected_compliance_rate": intervention.get("expected_compliance", 0.0)
-                }
+                    "intervention_type": validated_intervention.get("intervention_type"),
+                    "domain": validated_intervention.get("domain"),
+                    "behavioral_principle": validated_intervention.get("behavioral_principle"),
+                    "token_usage": llm_response.get("token_usage", {})
+                },
+                token_usage=llm_response.get("token_usage", {})
             )
             
         except Exception as e:
-            logger.error(f"Worker agent execution failed: {str(e)}", exc_info=True)
-            raise
+            logger.error(
+                "Worker agent execution failed",
+                error=str(e),
+                user_id=context.user_id,
+                exc_info=True
+            )
+            
+            # Return fallback intervention
+            fallback = self._generate_fallback_intervention(context, user_input)
+            return AgentResponse(
+                content=json.dumps(fallback, indent=2),
+                reasoning="Generated fallback intervention due to processing error",
+                confidence=0.3,
+                metadata={"fallback": True, "error": str(e)}
+            )
     
-    def _parse_intervention_request(self, user_input: str, context: AgentContext) -> InterventionRequest:
-        """
-        Parse user input and context to determine intervention type and parameters
-        """
-        # Default values
-        trigger_type = "general"
-        domain = "productivity"  # Default domain
-        urgency = "medium"
+    def _build_intervention_context(self, context: AgentContext, user_input: str) -> str:
+        """Build comprehensive context for intervention generation"""
         
-        # Extract domain from goals or input
-        if context.current_goals:
-            # Use the domain of the most recent or highest priority goal
-            primary_goal = context.current_goals[0]
-            domain = primary_goal.get("domain", "productivity")
-        
-        # Determine trigger type from context
-        if "schedule" in user_input.lower() or "morning" in user_input.lower():
-            trigger_type = "scheduled"
-        elif "struggling" in user_input.lower() or "help" in user_input.lower():
-            trigger_type = "reactive"
-            urgency = "high"
-        elif "predict" in user_input.lower() or "prevent" in user_input.lower():
-            trigger_type = "predictive"
-        
-        # Extract urgency indicators
-        if any(word in user_input.lower() for word in ["urgent", "critical", "emergency"]):
-            urgency = "critical"
-        elif any(word in user_input.lower() for word in ["struggling", "failing", "behind"]):
-            urgency = "high"
-        
-        return InterventionRequest(
-            trigger_type=trigger_type,
-            domain=domain,
-            urgency=urgency,
-            context_data=context.external_context or {},
-            user_state=context.user_state,
-            goal_progress={goal.get("id"): goal.get("progress", 0) for goal in context.current_goals}
-        )
-    
-    async def _analyze_user_patterns(self, context: AgentContext) -> Dict[str, Any]:
-        """
-        Analyze user behavioral patterns for personalization
-        """
-        user_id = context.user_id
-        
-        # Check cache first
-        if user_id in self.user_patterns_cache:
-            cached_patterns = self.user_patterns_cache[user_id]
-            if (datetime.utcnow() - cached_patterns["last_updated"]).seconds < 3600:  # 1 hour cache
-                return cached_patterns["patterns"]
-        
-        # Analyze patterns from recent history
-        patterns = await self.pattern_analyzer.analyze_user_patterns(
-            user_id=user_id,
-            history=context.recent_history,
-            goals=context.current_goals,
-            user_state=context.user_state
-        )
-        
-        # Cache the results
-        self.user_patterns_cache[user_id] = {
-            "patterns": patterns,
-            "last_updated": datetime.utcnow()
-        }
-        
-        return patterns
-    
-    async def _generate_scheduled_intervention(
-        self,
-        request: InterventionRequest,
-        user_patterns: Dict[str, Any],
-        context: AgentContext
-    ) -> Dict[str, Any]:
-        """
-        Generate scheduled interventions (morning briefings, evening reviews, etc.)
-        """
-        current_time = datetime.utcnow()
-        
-        # Build context-aware prompt
-        prompt = self._build_scheduled_intervention_prompt(request, user_patterns, context, current_time)
-        
-        # Call LLM with structured prompt
-        messages = [
-            SystemMessage(content=self.model_config["system_prompt"]),
-            HumanMessage(content=prompt)
+        context_parts = [
+            f"USER REQUEST: {user_input}",
+            f"TIMESTAMP: {datetime.utcnow().isoformat()}",
+            f"USER ID: {context.user_id}",
         ]
         
-        llm_response = await self._call_llm(messages)
+        # Current goals analysis
+        if context.current_goals:
+            context_parts.append("\nCURRENT GOALS:")
+            for goal in context.current_goals:
+                goal_info = f"- {goal.get('title', 'Untitled')}"
+                if goal.get('domain'):
+                    goal_info += f" (Domain: {goal['domain']})"
+                if goal.get('progress') is not None:
+                    goal_info += f" - Progress: {goal['progress']}%"
+                if goal.get('deadline'):
+                    goal_info += f" - Deadline: {goal['deadline']}"
+                if goal.get('status'):
+                    goal_info += f" - Status: {goal['status']}"
+                context_parts.append(goal_info)
         
-        # Parse and structure the response
-        intervention = self._parse_llm_intervention_response(llm_response["content"])
+        # User state and patterns
+        if context.user_state:
+            context_parts.append(f"\nUSER STATE:")
+            for key, value in context.user_state.items():
+                context_parts.append(f"- {key}: {value}")
         
-        # Add behavioral science techniques
-        intervention = await self.intervention_engine.enhance_with_behavioral_science(
-            intervention, user_patterns, request.domain
-        )
+        # Recent activity patterns
+        if context.recent_history:
+            context_parts.append(f"\nRECENT ACTIVITY (Last {len(context.recent_history)} events):")
+            for event in context.recent_history[-10:]:  # Last 10 events
+                timestamp = event.get('timestamp', 'Unknown')
+                action = event.get('action', 'Unknown action')
+                outcome = event.get('outcome', '')
+                context_parts.append(f"- {timestamp}: {action} {outcome}")
         
-        return intervention
-    
-    async def _generate_reactive_intervention(
-        self,
-        request: InterventionRequest,
-        user_patterns: Dict[str, Any],
-        context: AgentContext
-    ) -> Dict[str, Any]:
-        """
-        Generate reactive interventions for immediate user needs
-        """
-        # Build urgent, empathetic prompt
-        prompt = self._build_reactive_intervention_prompt(request, user_patterns, context)
+        # External context (calendar, weather, etc.)
+        if context.external_context:
+            context_parts.append(f"\nEXTERNAL CONTEXT:")
+            for key, value in context.external_context.items():
+                context_parts.append(f"- {key}: {value}")
         
-        messages = [
+        # Add behavioral insights if available
+        behavioral_insights = self._extract_behavioral_insights(context)
+        if behavioral_insights:
+            context_parts.append(f"\nBEHAVIORAL INSIGHTS:")
+            for insight in behavioral_insights:
+                context_parts.append(f"- {insight}")
+        
             SystemMessage(content=self.model_config["system_prompt"] + "\n\nIMPORTANT: The user needs immediate help. Be empathetic, practical, and actionable."),
             HumanMessage(content=prompt)
         ]
