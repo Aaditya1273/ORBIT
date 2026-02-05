@@ -22,9 +22,9 @@ async def test_openrouter_basic():
     
     # Test models available through your OpenRouter key
     test_models = [
-        "anthropic/claude-3-sonnet-20240229",  # For Supervisor Agent
-        "openai/gpt-4-turbo-preview",          # For Optimizer Agent  
-        "meta-llama/llama-3.1-8b-instruct:free",  # Free fallback model
+        "anthropic/claude-3-haiku",  # For Supervisor Agent
+        "openai/gpt-3.5-turbo",     # For Optimizer Agent  
+        "meta-llama/llama-3-8b-instruct",  # Free fallback model
     ]
     
     test_message = [
@@ -66,7 +66,7 @@ async def test_google_gemini():
         from langchain_google_genai import ChatGoogleGenerativeAI
         
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-pro",
+            model="gemini-2.5-flash",
             temperature=0.7,
             max_output_tokens=100,
             google_api_key=os.getenv('GOOGLE_API_KEY'),
@@ -93,10 +93,10 @@ async def main():
     
     print("\n🎉 OpenRouter Integration Test Complete!")
     print("\nModel Configuration for ORBIT:")
-    print("- Worker Agent: Google Gemini 1.5 Pro (direct API)")
-    print("- Supervisor Agent: Claude 3 Sonnet (via OpenRouter)")
-    print("- Optimizer Agent: GPT-4 Turbo (via OpenRouter)")
-    print("- Fallback: Llama 3.1 8B (free via OpenRouter)")
+    print("- Worker Agent: Google Gemini 2.5 Flash (direct API)")
+    print("- Supervisor Agent: Claude 3 Haiku (via OpenRouter)")
+    print("- Optimizer Agent: GPT-3.5 Turbo (via OpenRouter)")
+    print("- Fallback: Llama 3 8B (via OpenRouter)")
 
 if __name__ == "__main__":
     asyncio.run(main())

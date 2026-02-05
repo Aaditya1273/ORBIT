@@ -22,16 +22,24 @@ async def init_redis():
     global redis_client
     
     try:
-        # Parse Redis URL
+        # Parse Redis URL from environment
         redis_url = settings.REDIS_URL
         
-        # Create Redis client
-        redis_client = redis.from_url(
-            redis_url,
-            encoding="utf-8",
+        # Parse URL components for Upstash Redis
+        from urllib.parse import urlparse
+        parsed = urlparse(redis_url)
+        
+        # Create Redis client with direct connection for Upstash
+        redis_client = redis.Redis(
+            host=parsed.hostname,
+            port=parsed.port,
+            username=parsed.username,
+            password=parsed.password,
+            ssl=True,
+            ssl_check_hostname=False,
             decode_responses=True,
-            socket_connect_timeout=5,
-            socket_timeout=5,
+            socket_connect_timeout=30,
+            socket_timeout=30,
             retry_on_timeout=True,
             health_check_interval=30
         )
@@ -39,7 +47,7 @@ async def init_redis():
         # Test connection
         await redis_client.ping()
         
-        logger.info("Redis connection established", url=redis_url.split('@')[0] + '@***')
+        logger.info("Redis connection established", host=parsed.hostname)
         
     except Exception as e:
         logger.error("Failed to connect to Redis", error=str(e))

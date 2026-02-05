@@ -576,7 +576,7 @@ class OpenRouterLLM:
                 
                 # Create response object compatible with LangChain
                 class OpenRouterResponse:
-                    def __init__(self, content: str, usage: dict):
+                    def __init__(self, content: str, usage: dict, model: str):
                         self.content = content
                         self.response_metadata = {
                             "usage": {
@@ -584,20 +584,20 @@ class OpenRouterLLM:
                                 "completion_tokens": usage.get("completion_tokens", 0),
                                 "total_tokens": usage.get("total_tokens", 0)
                             },
-                            "model": self.model,
+                            "model": model,
                             "provider": "openrouter"
                         }
                 
-                return OpenRouterResponse(content, usage)
+                return OpenRouterResponse(content, usage, self.model)
                 
         except httpx.HTTPStatusError as e:
             logger.error(f"OpenRouter API error: {e.response.status_code} - {e.response.text}")
             
             # Fallback to free model if paid model fails
-            if self.model != "meta-llama/llama-3.1-8b-instruct:free":
+            if self.model != "meta-llama/llama-3-8b-instruct":
                 logger.info("Falling back to free model")
                 fallback_llm = OpenRouterLLM(
-                    model="meta-llama/llama-3.1-8b-instruct:free",
+                    model="meta-llama/llama-3-8b-instruct",
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
                     api_key=self.api_key

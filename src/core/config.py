@@ -6,7 +6,7 @@ Centralized configuration using Pydantic Settings
 import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings
-from pydantic import validator
+from pydantic import field_validator
 from functools import lru_cache
 
 class Settings(BaseSettings):
@@ -16,11 +16,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "ORBIT"
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
-    SECRET_KEY: str
+    SECRET_KEY: str = "orbit-dev-secret-key"
     ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "0.0.0.0"]
     
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite:///./orbit_dev.db"
     DATABASE_POOL_SIZE: int = 10
     DATABASE_MAX_OVERFLOW: int = 20
     
@@ -31,11 +31,11 @@ class Settings(BaseSettings):
     # AI Models
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
-    GOOGLE_API_KEY: str  # Gemini API key
-    OPEN_ROUTER_API_KEY: str  # OpenRouter for cost-effective model access
+    GOOGLE_API_KEY: str = "test-key"  # Gemini API key
+    OPEN_ROUTER_API_KEY: str = "test-key"  # OpenRouter for cost-effective model access
     
     # Evaluation & Monitoring
-    OPIK_API_KEY: str
+    OPIK_API_KEY: str = "test-key"
     OPIK_PROJECT_NAME: str = "orbit-production"
     OPIK_WORKSPACE: str = "orbit-workspace"
     LANGFUSE_SECRET_KEY: Optional[str] = None
@@ -55,11 +55,11 @@ class Settings(BaseSettings):
     N8N_API_KEY: Optional[str] = None
     
     # Security
-    JWT_SECRET_KEY: str
+    JWT_SECRET_KEY: str = "orbit-jwt-secret-dev"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    ENCRYPTION_KEY: str  # For encrypting sensitive user data
+    ENCRYPTION_KEY: str = "orbit-encryption-key-dev"  # For encrypting sensitive user data
     
     # Monitoring
     SENTRY_DSN: Optional[str] = None
@@ -86,19 +86,24 @@ class Settings(BaseSettings):
     MAX_INTEGRATIONS_PER_USER: int = 50
     DATA_RETENTION_DAYS: int = 365
     
-    @validator("ALLOWED_HOSTS", pre=True)
+    @field_validator("ALLOWED_HOSTS", mode="before")
+    @classmethod
     def parse_allowed_hosts(cls, v):
         if isinstance(v, str):
             return [host.strip() for host in v.split(",")]
-        return v
+        elif isinstance(v, list):
+            return v
+        return ["localhost", "127.0.0.1", "0.0.0.0"]
     
-    @validator("ENVIRONMENT")
+    @field_validator("ENVIRONMENT")
+    @classmethod
     def validate_environment(cls, v):
         if v not in ["development", "staging", "production"]:
             raise ValueError("ENVIRONMENT must be development, staging, or production")
         return v
     
-    @validator("LOG_LEVEL")
+    @field_validator("LOG_LEVEL")
+    @classmethod
     def validate_log_level(cls, v):
         if v not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
             raise ValueError("LOG_LEVEL must be a valid logging level")
@@ -119,7 +124,7 @@ settings = get_settings()
 # Model configurations
 MODEL_CONFIGS = {
     "worker": {
-        "model": "google/gemini-1.5-pro",  # Using Gemini directly
+        "model": "gemini-2.5-flash",  # Using Gemini 2.5 Flash (working model)
         "provider": "google",
         "max_tokens": 8192,
         "temperature": 0.7,
@@ -127,7 +132,7 @@ MODEL_CONFIGS = {
         "system_prompt": ""
     },
     "supervisor": {
-        "model": "anthropic/claude-3-sonnet-20240229",  # Using Claude via OpenRouter
+        "model": "anthropic/claude-3-haiku",  # Using Claude Haiku via OpenRouter (working model)
         "provider": "openrouter",
         "max_tokens": 4096,
         "temperature": 0.3,
@@ -135,7 +140,7 @@ MODEL_CONFIGS = {
         "system_prompt": ""
     },
     "optimizer": {
-        "model": "openai/gpt-4-turbo-preview",  # Using GPT-4 via OpenRouter
+        "model": "openai/gpt-3.5-turbo",  # Using GPT-3.5 via OpenRouter (working model)
         "provider": "openrouter",
         "max_tokens": 4096,
         "temperature": 0.5,
@@ -143,7 +148,7 @@ MODEL_CONFIGS = {
         "system_prompt": ""
     },
     "fallback": {
-        "model": "meta-llama/llama-3.1-8b-instruct:free",  # Free fallback model
+        "model": "meta-llama/llama-3-8b-instruct",  # Working free model
         "provider": "openrouter",
         "max_tokens": 2048,
         "temperature": 0.7,
