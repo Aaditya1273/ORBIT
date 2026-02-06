@@ -36,6 +36,7 @@ Frontend runs at: `http://localhost:3000`
 - ✅ **Upstash Redis** (Cloud, SSL encrypted, <50ms)
 - ✅ **SQLite Database** (Production-ready for 0-10K users)
 - ✅ **Opik Monitoring** (AI performance tracking)
+- ✅ **Sentry Error Tracking** (Real-time error monitoring)
 - ✅ **JWT Authentication** (Secure user sessions)
 
 ### **Frontend** ✅
@@ -109,10 +110,25 @@ Password: demo123
 
 ## 🧪 VERIFY SETUP
 
+### **Quick Verification**
 Run the verification script:
 ```bash
 python verify_setup.py
 ```
+
+### **Test Monitoring**
+Test error tracking and monitoring:
+```bash
+# Make sure backend is running first
+python test_monitoring.py
+```
+
+This will:
+- ✅ Check server status
+- ✅ Verify health endpoint
+- ✅ Test Sentry integration
+- ✅ Confirm Opik configuration
+- ✅ Trigger a test error to Sentry
 
 Expected output:
 ```
