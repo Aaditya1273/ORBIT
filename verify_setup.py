@@ -22,9 +22,12 @@ configs = {
     'OPEN_ROUTER_API_KEY': ('OpenRouter API', 'sk-or-v1'),
     'REDIS_URL': ('Upstash Redis', 'redis://'),
     'OPIK_API_KEY': ('Opik Monitoring', 'f4cpW5'),
+    'SENTRY_DSN': ('Sentry Error Tracking', 'https://'),
     'DATABASE_URL': ('Database', 'sqlite'),
-    'SECRET_KEY': ('App Secret', 'orbit'),
-    'JWT_SECRET_KEY': ('JWT Secret', 'orbit')
+    'SECRET_KEY': ('App Secret', 'RYE4F3'),
+    'JWT_SECRET_KEY': ('JWT Secret', 't5by4H'),
+    'SMTP_USER': ('Email (SMTP)', '@'),
+    'SMTP_PASSWORD': ('Email Password', 'awtt')
 }
 
 all_configured = True
