@@ -10,328 +10,225 @@ import {
   Typography,
   Divider,
   Chip,
-  useTheme,
-  useMediaQuery
+  Avatar
 } from '@mui/material';
 import {
   Dashboard,
-  TrackChanges,
-  Analytics,
+  EmojiEvents,
+  Timeline,
   Settings,
-  Psychology,
-  TrendingUp,
   FitnessCenter,
   AttachMoney,
   Work,
   School,
   People,
-  Integration,
-  Help,
-  Feedback
+  Psychology
 } from '@mui/icons-material';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-const DRAWER_WIDTH = 280;
-
-interface NavigationItem {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  path: string;
-  badge?: string | number;
-  color?: string;
-}
-
-const navigationItems: NavigationItem[] = [
-  {
-    id: 'dashboard',
-    label: 'Dashboard',
-    icon: <Dashboard />,
-    path: '/dashboard',
-  },
-  {
-    id: 'goals',
-    label: 'Goals',
-    icon: <TrackChanges />,
-    path: '/goals',
-    badge: 3, // Active goals count
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    icon: <Analytics />,
-    path: '/analytics',
-  },
-];
-
-const domainItems: NavigationItem[] = [
-  {
-    id: 'health',
-    label: 'Health & Fitness',
-    icon: <FitnessCenter />,
-    path: '/goals?domain=health',
-    color: '#4CAF50',
-  },
-  {
-    id: 'finance',
-    label: 'Finance',
-    icon: <AttachMoney />,
-    path: '/goals?domain=finance',
-    color: '#2196F3',
-  },
-  {
-    id: 'productivity',
-    label: 'Productivity',
-    icon: <Work />,
-    path: '/goals?domain=productivity',
-    color: '#FF9800',
-  },
-  {
-    id: 'learning',
-    label: 'Learning',
-    icon: <School />,
-    path: '/goals?domain=learning',
-    color: '#9C27B0',
-  },
-  {
-    id: 'social',
-    label: 'Social',
-    icon: <People />,
-    path: '/goals?domain=social',
-    color: '#E91E63',
-  },
-];
-
-const aiItems: NavigationItem[] = [
-  {
-    id: 'ai-insights',
-    label: 'AI Insights',
-    icon: <Psychology />,
-    path: '/ai-insights',
-    badge: 'New',
-  },
-  {
-    id: 'patterns',
-    label: 'Behavioral Patterns',
-    icon: <TrendingUp />,
-    path: '/patterns',
-  },
-];
-
-const bottomItems: NavigationItem[] = [
-  {
-    id: 'integrations',
-    label: 'Integrations',
-    icon: <Integration />,
-    path: '/integrations',
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: <Settings />,
-    path: '/settings',
-  },
-  {
-    id: 'help',
-    label: 'Help & Support',
-    icon: <Help />,
-    path: '/help',
-  },
-];
+const drawerWidth = 260;
 
 const Sidebar: React.FC = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const isActive = (path: string) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/' || location.pathname === '/dashboard';
-    }
-    return location.pathname.startsWith(path);
-  };
+  const mainMenuItems = [
+    { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard' },
+    { text: 'Goals', icon: <EmojiEvents />, path: '/goals' },
+    { text: 'Analytics', icon: <Timeline />, path: '/analytics' },
+    { text: 'Settings', icon: <Settings />, path: '/settings' },
+  ];
 
-  const handleNavigation = (path: string) => {
-    navigate(path);
-  };
+  const domainItems = [
+    { text: 'Health', icon: <FitnessCenter />, color: '#4CAF50', count: 3 },
+    { text: 'Finance', icon: <AttachMoney />, color: '#2196F3', count: 2 },
+    { text: 'Productivity', icon: <Work />, color: '#FF9800', count: 4 },
+    { text: 'Learning', icon: <School />, color: '#9C27B0', count: 1 },
+    { text: 'Social', icon: <People />, color: '#E91E63', count: 2 },
+  ];
 
-  const renderNavigationItem = (item: NavigationItem, index: number) => (
-    <motion.div
-      key={item.id}
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
-    >
-      <ListItem disablePadding sx={{ mb: 0.5 }}>
-        <ListItemButton
-          onClick={() => handleNavigation(item.path)}
-          selected={isActive(item.path)}
-          sx={{
-            borderRadius: 2,
-            mx: 1,
-            '&.Mui-selected': {
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              '&:hover': {
-                bgcolor: 'primary.dark',
-              },
-              '& .MuiListItemIcon-root': {
-                color: 'primary.contrastText',
-              },
-            },
-            '&:hover': {
-              bgcolor: 'action.hover',
-            },
-          }}
-        >
-          <ListItemIcon
-            sx={{
-              color: item.color || 'inherit',
-              minWidth: 40,
-            }}
-          >
-            {item.icon}
-          </ListItemIcon>
-          <ListItemText
-            primary={item.label}
-            primaryTypographyProps={{
-              fontSize: '0.875rem',
-              fontWeight: isActive(item.path) ? 600 : 400,
-            }}
-          />
-          {item.badge && (
-            <Chip
-              label={item.badge}
-              size="small"
-              color={typeof item.badge === 'string' ? 'secondary' : 'primary'}
-              sx={{
-                height: 20,
-                fontSize: '0.75rem',
-                '& .MuiChip-label': {
-                  px: 1,
-                },
-              }}
-            />
-          )}
-        </ListItemButton>
-      </ListItem>
-    </motion.div>
-  );
-
-  const sidebarContent = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <Box sx={{ p: 3, pb: 2 }}>
-        <Typography
-          variant="h5"
-          sx={{
-            fontWeight: 'bold',
-            background: 'linear-gradient(45deg, #6366f1, #8b5cf6)',
-            backgroundClip: 'text',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            textAlign: 'center',
-          }}
-        >
-          ORBIT
-        </Typography>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: 'block', textAlign: 'center', mt: 0.5 }}
-        >
-          Autonomous Life Optimization
-        </Typography>
-      </Box>
-
-      {/* Main Navigation */}
-      <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
-        <List sx={{ px: 1 }}>
-          {navigationItems.map((item, index) => renderNavigationItem(item, index))}
-        </List>
-
-        {/* Goal Domains */}
-        <Box sx={{ px: 2, mt: 3, mb: 1 }}>
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{ fontWeight: 600, fontSize: '0.75rem' }}
-          >
-            Goal Domains
-          </Typography>
-        </Box>
-        <List sx={{ px: 1 }}>
-          {domainItems.map((item, index) => renderNavigationItem(item, index + navigationItems.length))}
-        </List>
-
-        {/* AI Features */}
-        <Box sx={{ px: 2, mt: 3, mb: 1 }}>
-          <Typography
-            variant="overline"
-            color="text.secondary"
-            sx={{ fontWeight: 600, fontSize: '0.75rem' }}
-          >
-            AI Features
-          </Typography>
-        </Box>
-        <List sx={{ px: 1 }}>
-          {aiItems.map((item, index) => renderNavigationItem(item, index + navigationItems.length + domainItems.length))}
-        </List>
-      </Box>
-
-      {/* Bottom Navigation */}
-      <Box>
-        <Divider sx={{ mx: 2, mb: 1 }} />
-        <List sx={{ px: 1, pb: 2 }}>
-          {bottomItems.map((item, index) => renderNavigationItem(item, index))}
-        </List>
-
-        {/* AI Reliability Status */}
-        <Box sx={{ px: 3, pb: 3 }}>
-          <Box
-            sx={{
-              p: 2,
-              bgcolor: 'success.main',
-              color: 'success.contrastText',
-              borderRadius: 2,
-              textAlign: 'center',
-            }}
-          >
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>
-              AI Status: Operational
-            </Typography>
-            <Typography variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
-              97% Safety Score
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    </Box>
-  );
-
-  if (isMobile) {
-    // Mobile drawer (would be controlled by parent component)
-    return null; // For now, we'll implement mobile navigation later
-  }
+  const isActive = (path: string) => location.pathname === path;
 
   return (
     <Drawer
       variant="permanent"
       sx={{
-        width: DRAWER_WIDTH,
+        width: drawerWidth,
         flexShrink: 0,
         '& .MuiDrawer-paper': {
-          width: DRAWER_WIDTH,
+          width: drawerWidth,
           boxSizing: 'border-box',
-          borderRight: 1,
+          borderRight: '1px solid',
           borderColor: 'divider',
           bgcolor: 'background.paper',
         },
       }}
     >
-      {sidebarContent}
+      <Box sx={{ overflow: 'auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* Logo Section */}
+        <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
+            <Psychology />
+          </Avatar>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+              ORBIT
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Life Optimizer
+            </Typography>
+          </Box>
+        </Box>
+
+        <Divider />
+
+        {/* Main Navigation */}
+        <List sx={{ px: 2, py: 1 }}>
+          {mainMenuItems.map((item) => (
+            <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+              <ListItemButton
+                onClick={() => navigate(item.path)}
+                selected={isActive(item.path)}
+                sx={{
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText',
+                    '&:hover': {
+                      bgcolor: 'primary.dark',
+                    },
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.contrastText',
+                    },
+                  },
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    minWidth: 40,
+                    color: isActive(item.path) ? 'inherit' : 'text.secondary',
+                  }}
+                >
+                  {item.icon}
+                </ListItemIcon>
+                <ListItemText 
+                  primary={item.text}
+                  primaryTypographyProps={{
+                    fontWeight: isActive(item.path) ? 600 : 400,
+                  }}
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+
+        <Divider sx={{ mx: 2 }} />
+
+        {/* Domains Section */}
+        <Box sx={{ px: 2, py: 2 }}>
+          <Typography
+            variant="caption"
+            sx={{
+              px: 2,
+              py: 1,
+              display: 'block',
+              color: 'text.secondary',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+            }}
+          >
+            Goal Domains
+          </Typography>
+          <List sx={{ py: 0 }}>
+            {domainItems.map((item) => (
+              <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
+                <ListItemButton
+                  sx={{
+                    borderRadius: 2,
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                    },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <Avatar
+                      sx={{
+                        bgcolor: item.color,
+                        width: 32,
+                        height: 32,
+                      }}
+                    >
+                      {React.cloneElement(item.icon, { sx: { fontSize: 18 } })}
+                    </Avatar>
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      fontSize: '0.875rem',
+                    }}
+                  />
+                  <Chip
+                    label={item.count}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: '0.75rem',
+                      bgcolor: `${item.color}20`,
+                      color: item.color,
+                      fontWeight: 600,
+                    }}
+                  />
+                </ListItemButton>
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+
+        {/* Bottom Section - AI Status */}
+        <Box sx={{ mt: 'auto', p: 2 }}>
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Psychology sx={{ mr: 1, fontSize: 20 }} />
+              <Typography variant="subtitle2" fontWeight="bold">
+                AI Status
+              </Typography>
+            </Box>
+            <Typography variant="caption" sx={{ display: 'block', mb: 1, opacity: 0.9 }}>
+              All systems operational
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Chip
+                label="Safety: 98%"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  color: 'inherit',
+                  fontSize: '0.7rem',
+                  height: 20,
+                }}
+              />
+              <Chip
+                label="Active"
+                size="small"
+                sx={{
+                  bgcolor: 'rgba(76, 175, 80, 0.3)',
+                  color: 'inherit',
+                  fontSize: '0.7rem',
+                  height: 20,
+                }}
+              />
+            </Box>
+          </Box>
+        </Box>
+      </Box>
     </Drawer>
   );
 };
