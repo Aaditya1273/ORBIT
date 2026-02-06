@@ -18,26 +18,42 @@ from src.core.config import settings
 from src.database.database import init_db
 from src.core.redis import init_redis, health_check_redis
 from src.api.main import app as api_app
-from src.core.exceptions import ORBITException
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, settings.LOG_LEVEL),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Sentry for error tracking
+# Initialize Sentry for error tracking and performance monitoring
 if settings.SENTRY_DSN:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
+        # Enable FastAPI integration for automatic request tracking
         integrations=[
             FastApiIntegration(auto_enabling=True),
             SqlalchemyIntegration(),
         ],
-        traces_sample_rate=0.1,
+        # Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring
+        # In production, reduce this to 0.1 (10%) or lower to reduce volume
+        traces_sample_rate=1.0 if settings.ENVIRONMENT == "development" else 0.1,
+        
+        # Send default PII (Personally Identifiable Information) like user IP, headers
+        send_default_pii=True,
+        
+        # Set environment
         environment=settings.ENVIRONMENT,
+        
+        # Release tracking (optional)
+        release=f"orbit@{settings.APP_VERSION}",
+        
+        # Enable profiling (optional)
+        profiles_sample_rate=0.1,
     )
+    logger.info("✅ Sentry error monitoring initialized")
+else:
+    logger.warning("⚠️  Sentry DSN not configured - error monitoring disabled")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,16 +62,22 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 Starting ORBIT platform...")
     
     # Initialize database
-    await init_db()
-    logger.info("✅ Database initialized")
+    try:
+        await init_db()
+        logger.info("✅ Database initialized")
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+        if settings.SENTRY_DSN:
+            sentry_sdk.capture_exception(e)
     
     # Initialize Redis
-    await init_redis()
-    logger.info("✅ Redis initialized")
-    
-    # Setup monitoring
-    setup_monitoring()
-    logger.info("✅ Monitoring setup complete")
+    try:
+        await init_redis()
+        logger.info("✅ Redis initialized")
+    except Exception as e:
+        logger.error(f"❌ Redis initialization failed: {e}")
+        if settings.SENTRY_DSN:
+            sentry_sdk.capture_exception(e)
     
     logger.info("🌟 ORBIT platform ready!")
     
@@ -68,7 +90,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ORBIT API",
     description="Autonomous Life Optimization Platform with Transparent AI",
-    version="1.0.0",
+    version=settings.APP_VERSION,
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
     lifespan=lifespan
@@ -77,7 +99,7 @@ app = FastAPI(
 # Add middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_HOSTS,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"] + settings.ALLOWED_HOSTS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,31 +107,25 @@ app.add_middleware(
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=settings.ALLOWED_HOSTS
+    allowed_hosts=["localhost", "127.0.0.1", "0.0.0.0"] + settings.ALLOWED_HOSTS
 )
 
 # Global exception handler
-@app.exception_handler(ORBITException)
-async def orbit_exception_handler(request: Request, exc: ORBITException):
-    """Handle custom ORBIT exceptions"""
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": exc.error_code,
-            "message": exc.message,
-            "details": exc.details
-        }
-    )
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Handle unexpected exceptions"""
+    """Handle unexpected exceptions and send to Sentry"""
     logger.error(f"Unexpected error: {exc}", exc_info=True)
+    
+    # Capture exception in Sentry
+    if settings.SENTRY_DSN:
+        sentry_sdk.capture_exception(exc)
+    
     return JSONResponse(
         status_code=500,
         content={
             "error": "INTERNAL_SERVER_ERROR",
-            "message": "An unexpected error occurred"
+            "message": "An unexpected error occurred",
+            "detail": str(exc) if settings.DEBUG else None
         }
     )
 
@@ -133,19 +149,45 @@ async def health_check():
             "services": {
                 "redis": redis_health,
                 "database": db_health,
-                "api": {"status": "healthy", "message": "API operational"}
+                "api": {"status": "healthy", "message": "API operational"},
+                "sentry": {
+                    "status": "enabled" if settings.SENTRY_DSN else "disabled",
+                    "environment": settings.ENVIRONMENT
+                }
             },
-            "version": "1.0.0",
+            "version": settings.APP_VERSION,
             "environment": settings.ENVIRONMENT
         }
         
     except Exception as e:
         logger.error(f"Health check failed: {e}")
+        
+        # Capture health check failures in Sentry
+        if settings.SENTRY_DSN:
+            sentry_sdk.capture_exception(e)
+        
         return {
             "status": "unhealthy",
             "error": str(e),
             "timestamp": "unknown"
         }
+
+# Sentry debug endpoint (only in development)
+@app.get("/sentry-debug")
+async def trigger_sentry_error():
+    """
+    Trigger a test error to verify Sentry integration
+    Only available in development mode
+    """
+    if settings.ENVIRONMENT != "development":
+        return JSONResponse(
+            status_code=403,
+            content={"error": "This endpoint is only available in development mode"}
+        )
+    
+    # This will trigger an error and send it to Sentry
+    division_by_zero = 1 / 0
+    return {"message": "This should never be reached"}
 
 # Include API routes
 app.include_router(api_app, prefix="/api/v1")
@@ -157,9 +199,15 @@ async def root():
     return {
         "name": "ORBIT",
         "description": "Autonomous Life Optimization Platform",
-        "version": "1.0.0",
+        "version": settings.APP_VERSION,
         "status": "operational",
-        "docs": "/docs" if settings.ENVIRONMENT != "production" else None
+        "environment": settings.ENVIRONMENT,
+        "monitoring": {
+            "sentry": "enabled" if settings.SENTRY_DSN else "disabled",
+            "opik": "enabled" if settings.OPIK_API_KEY else "disabled"
+        },
+        "docs": "/docs" if settings.ENVIRONMENT != "production" else None,
+        "health": "/health"
     }
 
 if __name__ == "__main__":

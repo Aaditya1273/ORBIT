@@ -9,6 +9,7 @@ langchain-google-genai==0.0.11
 
 # Evaluation and Monitoring
 opik==1.10.6
+opik[fastapi]==1.10.6  # FastAPI integration for automatic tracing
 langfuse==2.21.0
 wandb==0.16.4
 

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     
     # Application
     APP_NAME: str = "ORBIT"
+    APP_VERSION: str = "1.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
     SECRET_KEY: str = "orbit-dev-secret-key"
