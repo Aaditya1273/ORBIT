@@ -1,28 +1,23 @@
-import axios, { AxiosInstance } from 'axios';
-import toast from 'react-hot-toast';
+import axios, { AxiosInstance, AxiosError } from 'axios';
 
-// Create axios instance with base configuration
-const api: AxiosInstance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1',
+// API Configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
+
+// Create axios instance
+const apiClient: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
+// Request interceptor - Add auth token
+apiClient.interceptors.request.use(
   (config) => {
-    const authStorage = localStorage.getItem('orbit-auth-storage');
-    if (authStorage) {
-      try {
-        const { state } = JSON.parse(authStorage);
-        if (state?.token) {
-          config.headers.Authorization = `Bearer ${state.token}`;
-        }
-      } catch (error) {
-        console.error('Error parsing auth storage:', error);
-      }
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -31,88 +26,92 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
-api.interceptors.response.use(
+// Response interceptor - Handle errors
+apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response) {
-      // Server responded with error status
-      const status = error.response.status;
-      const message = error.response.data?.message || error.message;
-
-      switch (status) {
-        case 401:
-          toast.error('Session expired. Please login again.');
-          // Clear auth and redirect to login
-          localStorage.removeItem('orbit-auth-storage');
-          window.location.href = '/login';
-          break;
-        case 403:
-          toast.error('Access denied');
-          break;
-        case 404:
-          toast.error('Resource not found');
-          break;
-        case 500:
-          toast.error('Server error. Please try again later.');
-          break;
-        default:
-          toast.error(message || 'An error occurred');
-      }
-    } else if (error.request) {
-      // Request made but no response
-      toast.error('Network error. Please check your connection.');
-    } else {
-      // Something else happened
-      toast.error('An unexpected error occurred');
+  async (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      // Unauthorized - clear token and redirect to login
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
-
     return Promise.reject(error);
   }
 );
 
-// API endpoints
+// Auth API
 export const authApi = {
-  login: async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
+  register: async (data: { email: string; name: string; password: string }) => {
+    const response = await apiClient.post('/auth/register', data);
+    if (response.data.access_token) {
+      localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
     return response.data;
   },
 
-  register: async (email: string, password: string, name: string) => {
-    const response = await api.post('/auth/register', { email, password, name });
+  login: async (email: string, password: string) => {
+    const formData = new FormData();
+    formData.append('username', email); // OAuth2 uses 'username' field
+    formData.append('password', password);
+    
+    const response = await apiClient.post('/auth/login', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    if (response.data.access_token) {
+      localStorage.setItem('access_token', response.data.access_token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
     return response.data;
   },
 
   logout: async () => {
-    const response = await api.post('/auth/logout');
+    try {
+      await apiClient.post('/auth/logout');
+    } finally {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+    }
+  },
+
+  getCurrentUser: async () => {
+    const response = await apiClient.get('/auth/me');
     return response.data;
   },
 
   refreshToken: async () => {
-    const response = await api.post('/auth/refresh');
+    const response = await apiClient.post('/auth/refresh');
+    if (response.data.access_token) {
+      localStorage.setItem('access_token', response.data.access_token);
+    }
     return response.data;
   },
 };
 
+// Dashboard API
 export const dashboardApi = {
   getDashboardData: async () => {
-    // Mock data for demo - replace with actual API call
+    // Mock data for now - will be replaced with real API call
     return {
       user: {
-        id: 'demo-user-123',
+        id: '1',
         name: 'Demo User',
         streak_days: 7,
-        total_goals: 12,
-        active_goals: 8,
+        total_goals: 5,
+        active_goals: 3,
       },
-      today_focus: 'Complete morning workout and finish project proposal',
+      today_focus: 'Complete workout and finish project milestone',
       energy_level: 'High',
       ai_reliability: {
-        interventions_this_week: 24,
-        helpful_percentage: 92,
-        safety_score: 0.98,
-        relevance_score: 0.94,
-        accuracy_score: 0.96,
+        interventions_this_week: 12,
+        helpful_percentage: 85,
+        safety_score: 0.92,
+        relevance_score: 0.88,
+        accuracy_score: 0.90,
       },
       goals: [
         {
@@ -120,132 +119,112 @@ export const dashboardApi = {
           title: 'Exercise 3x per week',
           domain: 'health',
           progress: 67,
-          next_action: 'Morning run at 7 AM',
-          ai_insight: 'Your consistency has improved 40% this month!',
+          next_action: 'Schedule tomorrow\'s workout',
+          ai_insight: 'You\'re most consistent on Monday mornings',
         },
         {
           id: '2',
           title: 'Save $500 monthly',
           domain: 'finance',
           progress: 80,
-          next_action: 'Review spending categories',
-          ai_insight: 'You\'re on track to exceed your goal by 15%',
-        },
-        {
-          id: '3',
-          title: 'Complete online course',
-          domain: 'learning',
-          progress: 45,
-          next_action: 'Watch Module 5 videos',
-          ai_insight: 'Schedule 30min daily for consistent progress',
-        },
-        {
-          id: '4',
-          title: 'Finish project proposal',
-          domain: 'productivity',
-          progress: 90,
-          next_action: 'Final review and submit',
-          ai_insight: 'Great momentum! You\'re almost there',
+          next_action: 'Review this week\'s spending',
+          ai_insight: 'On track to exceed your goal this month',
         },
       ],
       todays_plan: [
-        { time: '07:00', action: 'Morning workout (30 min)' },
-        { time: '09:00', action: 'Work on project proposal' },
-        { time: '12:00', action: 'Lunch break & meditation' },
-        { time: '14:00', action: 'Online course - Module 5' },
-        { time: '17:00', action: 'Review daily progress' },
-        { time: '19:00', action: 'Social time with friends' },
+        { time: '9:00', action: 'Morning workout' },
+        { time: '11:00', action: 'Project work session' },
+        { time: '14:00', action: 'Team meeting' },
+        { time: '16:00', action: 'Learning time' },
       ],
     };
   },
 };
 
+// Goals API
 export const goalsApi = {
-  getGoals: async () => {
-    const response = await api.get('/goals');
+  getGoals: async (status?: string) => {
+    const response = await apiClient.get('/goals', {
+      params: { status },
+    });
     return response.data;
   },
 
-  getGoal: async (id: string) => {
-    const response = await api.get(`/goals/${id}`);
+  getGoal: async (goalId: string) => {
+    const response = await apiClient.get(`/goals/${goalId}`);
     return response.data;
   },
 
   createGoal: async (goalData: any) => {
-    const response = await api.post('/goals', goalData);
+    const response = await apiClient.post('/goals', goalData);
     return response.data;
   },
 
-  updateGoal: async (id: string, goalData: any) => {
-    const response = await api.put(`/goals/${id}`, goalData);
+  updateGoal: async (goalId: string, goalData: any) => {
+    const response = await apiClient.put(`/goals/${goalId}`, goalData);
     return response.data;
   },
 
-  deleteGoal: async (id: string) => {
-    const response = await api.delete(`/goals/${id}`);
+  deleteGoal: async (goalId: string) => {
+    const response = await apiClient.delete(`/goals/${goalId}`);
     return response.data;
   },
 
-  logProgress: async (id: string, progressData: any) => {
-    const response = await api.post(`/goals/${id}/progress`, progressData);
+  logProgress: async (goalId: string, progressData: any) => {
+    const response = await apiClient.post(`/goals/${goalId}/progress`, progressData);
     return response.data;
   },
 };
 
+// Interventions API
 export const interventionsApi = {
-  getInterventions: async () => {
-    const response = await api.get('/interventions');
-    return response.data;
-  },
-
   generateIntervention: async (data: any) => {
-    const response = await api.post('/interventions/generate', data);
+    const response = await apiClient.post('/interventions/generate', data);
     return response.data;
   },
 
-  rateIntervention: async (id: string, rating: number, feedback?: string) => {
-    const response = await api.post(`/interventions/${id}/rate`, { rating, feedback });
-    return response.data;
-  },
-};
-
-export const analyticsApi = {
-  getAnalytics: async (timeframe: string = 'week') => {
-    const response = await api.get(`/analytics?timeframe=${timeframe}`);
+  getIntervention: async (interventionId: string) => {
+    const response = await apiClient.get(`/interventions/${interventionId}`);
     return response.data;
   },
 
-  getGoalAnalytics: async (goalId: string) => {
-    const response = await api.get(`/analytics/goals/${goalId}`);
+  getInterventions: async (userId: string) => {
+    const response = await apiClient.get('/interventions', {
+      params: { user_id: userId },
+    });
     return response.data;
   },
 
-  getDomainAnalytics: async (domain: string) => {
-    const response = await api.get(`/analytics/domains/${domain}`);
+  provideFeedback: async (interventionId: string, feedback: any) => {
+    const response = await apiClient.post(`/interventions/${interventionId}/feedback`, feedback);
     return response.data;
   },
 };
 
-export const userApi = {
-  getProfile: async () => {
-    const response = await api.get('/users/me');
+// Users API
+export const usersApi = {
+  getUser: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}`);
     return response.data;
   },
 
-  updateProfile: async (userData: any) => {
-    const response = await api.put('/users/me', userData);
+  updateUser: async (userId: string, userData: any) => {
+    const response = await apiClient.put(`/users/${userId}`, userData);
     return response.data;
   },
 
-  updatePreferences: async (preferences: any) => {
-    const response = await api.put('/users/me/preferences', preferences);
-    return response.data;
-  },
-
-  completeOnboarding: async (onboardingData: any) => {
-    const response = await api.post('/users/me/onboarding', onboardingData);
+  updatePreferences: async (userId: string, preferences: any) => {
+    const response = await apiClient.put(`/users/${userId}/preferences`, preferences);
     return response.data;
   },
 };
 
-export default api;
+// Health Check
+export const healthApi = {
+  check: async () => {
+    const response = await apiClient.get('/health');
+    return response.data;
+  },
+};
+
+export default apiClient;

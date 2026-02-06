@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { authApi } from '../services/api';
 import toast from 'react-hot-toast';
 
 interface User {
@@ -7,159 +7,88 @@ interface User {
   email: string;
   name: string;
   onboarding_completed: boolean;
-  created_at: string;
 }
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  error: string | null;
-  
-  // Actions
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => void;
-  updateUser: (user: Partial<User>) => void;
-  clearError: () => void;
+  register: (email: string, name: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  checkAuth: () => void;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  isAuthenticated: false,
+  isLoading: false,
 
-      login: async (email: string, password: string) => {
-        set({ isLoading: true, error: null });
-        
-        try {
-          // Demo login - replace with actual API call
-          if (email === 'demo@orbit.ai' && password === 'demo123') {
-            const mockUser: User = {
-              id: 'demo-user-123',
-              email: 'demo@orbit.ai',
-              name: 'Demo User',
-              onboarding_completed: true,
-              created_at: new Date().toISOString(),
-            };
-            
-            const mockToken = 'demo-jwt-token-' + Date.now();
-            
-            set({
-              user: mockUser,
-              token: mockToken,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null,
-            });
-            
-            toast.success('Welcome back to ORBIT!');
-          } else {
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // For demo purposes, accept any credentials
-            const mockUser: User = {
-              id: 'user-' + Date.now(),
-              email: email,
-              name: email.split('@')[0],
-              onboarding_completed: true,
-              created_at: new Date().toISOString(),
-            };
-            
-            const mockToken = 'jwt-token-' + Date.now();
-            
-            set({
-              user: mockUser,
-              token: mockToken,
-              isAuthenticated: true,
-              isLoading: false,
-              error: null,
-            });
-            
-            toast.success('Welcome to ORBIT!');
-          }
-        } catch (error: any) {
-          set({
-            isLoading: false,
-            error: error.message || 'Login failed',
-          });
-          toast.error('Login failed. Please try again.');
-          throw error;
-        }
-      },
-
-      register: async (email: string, password: string, name: string) => {
-        set({ isLoading: true, error: null });
-        
-        try {
-          // Simulate API call
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          const mockUser: User = {
-            id: 'user-' + Date.now(),
-            email: email,
-            name: name,
-            onboarding_completed: false, // New users need onboarding
-            created_at: new Date().toISOString(),
-          };
-          
-          const mockToken = 'jwt-token-' + Date.now();
-          
-          set({
-            user: mockUser,
-            token: mockToken,
-            isAuthenticated: true,
-            isLoading: false,
-            error: null,
-          });
-          
-          toast.success('Account created successfully!');
-        } catch (error: any) {
-          set({
-            isLoading: false,
-            error: error.message || 'Registration failed',
-          });
-          toast.error('Registration failed. Please try again.');
-          throw error;
-        }
-      },
-
-      logout: () => {
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          error: null,
-        });
-        toast.success('Logged out successfully');
-      },
-
-      updateUser: (userData: Partial<User>) => {
-        const currentUser = get().user;
-        if (currentUser) {
-          set({
-            user: { ...currentUser, ...userData },
-          });
-        }
-      },
-
-      clearError: () => {
-        set({ error: null });
-      },
-    }),
-    {
-      name: 'orbit-auth-storage',
-      partialize: (state) => ({
-        user: state.user,
-        token: state.token,
-        isAuthenticated: state.isAuthenticated,
-      }),
+  login: async (email: string, password: string) => {
+    set({ isLoading: true });
+    try {
+      const response = await authApi.login(email, password);
+      set({
+        user: response.user,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      toast.success('Logged in successfully!');
+    } catch (error: any) {
+      set({ isLoading: false });
+      const message = error.response?.data?.detail || 'Login failed';
+      toast.error(message);
+      throw error;
     }
-  )
-);
+  },
+
+  register: async (email: string, name: string, password: string) => {
+    set({ isLoading: false });
+    try {
+      const response = await authApi.register({ email, name, password });
+      set({
+        user: response.user,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      toast.success('Account created successfully!');
+    } catch (error: any) {
+      set({ isLoading: false });
+      const message = error.response?.data?.detail || 'Registration failed';
+      toast.error(message);
+      throw error;
+    }
+  },
+
+  logout: async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      set({
+        user: null,
+        isAuthenticated: false,
+      });
+      toast.success('Logged out successfully');
+    }
+  },
+
+  checkAuth: () => {
+    const token = localStorage.getItem('access_token');
+    const userStr = localStorage.getItem('user');
+    
+    if (token && userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        set({
+          user,
+          isAuthenticated: true,
+        });
+      } catch (error) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+      }
+    }
+  },
+}));

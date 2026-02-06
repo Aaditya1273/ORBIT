@@ -63,7 +63,8 @@ async def lifespan(app: FastAPI):
     
     # Initialize database
     try:
-        await init_db()
+        from src.database.database import init_db
+        init_db()  # Create all tables
         logger.info("✅ Database initialized")
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
@@ -190,6 +191,8 @@ async def trigger_sentry_error():
     return {"message": "This should never be reached"}
 
 # Include API routes
+from src.api.auth import router as auth_router
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(api_app, prefix="/api/v1")
 
 # Root endpoint
