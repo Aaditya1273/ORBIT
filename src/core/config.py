@@ -87,6 +87,14 @@ class Settings(BaseSettings):
     MAX_INTEGRATIONS_PER_USER: int = 50
     DATA_RETENTION_DAYS: int = 365
     
+    # Email Configuration
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    FROM_EMAIL: str = "noreply@orbit.ai"
+    FROM_NAME: str = "ORBIT AI Platform"
+    
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
     def parse_allowed_hosts(cls, v):
