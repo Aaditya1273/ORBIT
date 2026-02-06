@@ -39,7 +39,7 @@ class EmailService:
         """Create SMTP connection"""
         try:
             # Create SMTP connection
-            server = smtplib.SMTP(self.smtp_host, self.smtp_port)
+            server = smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10)
             server.starttls()  # Enable TLS encryption
             
             # Login if credentials provided
@@ -48,6 +48,20 @@ class EmailService:
             
             return server
             
+        except (TimeoutError, OSError) as e:
+            logger.warning(
+                "SMTP connection timeout - email service unavailable",
+                error=str(e),
+                smtp_host=self.smtp_host,
+                smtp_port=self.smtp_port
+            )
+            raise
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(
+                "SMTP authentication failed - check credentials",
+                error=str(e)
+            )
+            raise
         except Exception as e:
             logger.error(f"Failed to create SMTP connection: {str(e)}")
             raise
@@ -112,6 +126,14 @@ class EmailService:
             
             return True
             
+        except (TimeoutError, OSError) as e:
+            logger.warning(
+                "Email not sent - SMTP connection unavailable",
+                to_email=to_email,
+                subject=subject,
+                error=str(e)
+            )
+            return False
         except Exception as e:
             logger.error(
                 "Failed to send email",

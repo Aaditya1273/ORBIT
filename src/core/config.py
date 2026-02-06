@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: Optional[str] = None
     FROM_EMAIL: str = "noreply@orbit.ai"
     FROM_NAME: str = "ORBIT AI Platform"
+    FRONTEND_URL: str = "http://localhost:3000"
     
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod

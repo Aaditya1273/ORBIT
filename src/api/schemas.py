@@ -5,8 +5,27 @@ Pydantic models for request/response validation
 
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, EmailStr, validator
 from enum import Enum
+
+
+# User Schemas
+class UserCreate(BaseModel):
+    """Schema for creating a new user"""
+    email: EmailStr
+    name: str = Field(..., min_length=2, max_length=100)
+    password: str = Field(..., min_length=8)
+
+
+class UserResponse(BaseModel):
+    """Schema for user response"""
+    id: int
+    email: str
+    name: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 class DomainType(str, Enum):
@@ -106,11 +125,25 @@ class GoalUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=1000)
     target_date: Optional[datetime] = None
     priority: Optional[int] = Field(None, ge=1, le=5)
-    status: Optional[str] = Field(None, regex="^(active|paused|completed|abandoned)$")
+    status: Optional[str] = Field(None, pattern="^(active|paused|completed|abandoned)$")
     current_value: Optional[Union[int, float, str]] = None
 
 
 # Response Schemas
+class EvaluationResponse(BaseModel):
+    """Response containing AI evaluation metrics"""
+    safety_score: float = Field(..., ge=0.0, le=1.0)
+    relevance_score: float = Field(..., ge=0.0, le=1.0)
+    accuracy_score: float = Field(..., ge=0.0, le=1.0)
+    adherence_probability: float = Field(..., ge=0.0, le=1.0)
+    engagement_quality: float = Field(..., ge=0.0, le=1.0)
+    overall_score: float = Field(..., ge=0.0, le=1.0)
+    feedback: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
 class InterventionResponse(BaseModel):
     """Response containing generated intervention"""
     intervention_id: str = Field(..., description="Unique intervention identifier")
@@ -291,7 +324,7 @@ class AnalyticsRequest(BaseModel):
     start_date: datetime = Field(..., description="Start date for analytics")
     end_date: datetime = Field(..., description="End date for analytics")
     metrics: List[str] = Field(default=[], description="Specific metrics to include")
-    granularity: str = Field(default="daily", regex="^(hourly|daily|weekly|monthly)$")
+    granularity: str = Field(default="daily", pattern="^(hourly|daily|weekly|monthly)$")
 
 
 class AnalyticsResponse(BaseModel):

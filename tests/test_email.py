@@ -6,9 +6,19 @@ Verifies SMTP settings and sends a test email
 import asyncio
 from dotenv import load_dotenv
 import os
+import sys
+from pathlib import Path
 
-# Load environment
-load_dotenv('.env.local')
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+# Load environment from project root
+env_path = project_root / '.env.local'
+load_dotenv(env_path)
+
+print(f"Loading environment from: {env_path}")
+print(f"File exists: {env_path.exists()}")
 
 def test_email_config():
     """Test email configuration"""

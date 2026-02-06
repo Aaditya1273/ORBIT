@@ -6,7 +6,7 @@ Generates personalized interventions, daily plans, and behavioral nudges
 import json
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 from .base_agent import BaseAgent, AgentResponse, AgentContext
 from ..core.config import settings, DOMAIN_CONFIGS
@@ -228,20 +228,9 @@ QUALITY STANDARDS:
             for insight in behavioral_insights:
                 context_parts.append(f"- {insight}")
         
-            SystemMessage(content=self.model_config["system_prompt"] + "\n\nIMPORTANT: The user needs immediate help. Be empathetic, practical, and actionable."),
-            HumanMessage(content=prompt)
-        ]
-        
-        llm_response = await self._call_llm(messages)
-        intervention = self._parse_llm_intervention_response(llm_response["content"])
-        
-        # Apply crisis intervention techniques if needed
-        if request.urgency in ["high", "critical"]:
-            intervention = await self.intervention_engine.apply_crisis_intervention_techniques(
-                intervention, user_patterns, context
-            )
-        
-        return intervention
+        # Build and return prompt
+        prompt = "\n".join(context_parts)
+        return prompt
     
     async def _generate_predictive_intervention(
         self,

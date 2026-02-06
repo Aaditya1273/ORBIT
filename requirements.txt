@@ -27,7 +27,6 @@ psycopg2-binary==2.9.9
 
 # Background Tasks and Scheduling
 celery==5.3.6
-celery-beat==2.5.0
 apscheduler==3.10.4
 
 # HTTP and API clients
@@ -75,9 +74,6 @@ google-auth-httplib2==0.2.0
 google-api-python-client==2.119.0
 stripe==8.2.0
 twilio==9.0.4
-
-# n8n Integration
-n8n-python-sdk==0.1.0
 
 # Monitoring and Logging
 structlog==24.1.0

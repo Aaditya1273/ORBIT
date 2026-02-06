@@ -25,12 +25,17 @@ configs = {
     'SENTRY_DSN': ('Sentry Error Tracking', 'https://'),
     'DATABASE_URL': ('Database', 'sqlite'),
     'SECRET_KEY': ('App Secret', 'RYE4F3'),
-    'JWT_SECRET_KEY': ('JWT Secret', 't5by4H'),
-    'SMTP_USER': ('Email (SMTP)', '@'),
+    'JWT_SECRET_KEY': ('JWT Secret', 't5by4H')
+}
+
+email_configs = {
+    'SMTP_USER': ('Email (SMTP)', '24bec109'),
     'SMTP_PASSWORD': ('Email Password', 'awtt')
 }
 
 all_configured = True
+email_configured = True
+
 for key, (name, prefix) in configs.items():
     value = os.getenv(key, '')
     if value and value.startswith(prefix):
@@ -38,6 +43,15 @@ for key, (name, prefix) in configs.items():
     else:
         print(f"❌ {name:25} Missing or invalid")
         all_configured = False
+
+# Check email separately (optional)
+for key, (name, prefix) in email_configs.items():
+    value = os.getenv(key, '')
+    if value and value.startswith(prefix):
+        print(f"✅ {name:25} Configured")
+    else:
+        print(f"⚠️  {name:25} Missing (optional)")
+        email_configured = False
 
 # Check database file
 print("\n💾 DATABASE:")
@@ -61,7 +75,7 @@ print("=" * 70)
 
 if all_configured:
     print("🎉 ALL REQUIRED SERVICES CONFIGURED!")
-    print("\n✅ You have:")
+    print("\n✅ Core Services:")
     print("   • Google Gemini API (Worker Agent)")
     print("   • OpenRouter API (Supervisor & Optimizer)")
     print("   • Upstash Redis (Caching & Sessions)")
@@ -69,7 +83,17 @@ if all_configured:
     print("   • Sentry (Error Tracking)")
     print("   • SQLite Database (Production-ready)")
     print("   • Security Keys (JWT & App)")
-    print("   • Email (SMTP for notifications)")
+    
+    if email_configured:
+        print("\n✅ Email Service:")
+        print("   • SMTP configured")
+        print("   • Welcome emails, verification, notifications")
+        print("\n💡 Test email: python test_email_simple.py")
+    else:
+        print("\n⚠️  Email Service:")
+        print("   • SMTP not configured (optional)")
+        print("   • Platform works without email")
+        print("   • See docs/EMAIL_TROUBLESHOOTING.md")
     
     print("\n🚀 READY TO LAUNCH!")
     print("\nStart the app with:")
@@ -83,16 +107,6 @@ if all_configured:
     print("\n📈 SCALABILITY:")
     print("   SQLite handles: 0-10K users (current)")
     print("   Upgrade to PostgreSQL only when needed")
-    
-    print("\n📧 EMAIL FEATURES:")
-    print("   • Welcome emails")
-    print("   • Email verification")
-    print("   • Password reset")
-    print("   • Intervention notifications")
-    print("   • Goal milestone alerts")
-    
-    print("\n💡 TEST EMAIL:")
-    print("   Run: python test_email.py")
     
 else:
     print("⚠️  SOME CONFIGURATIONS MISSING")

@@ -349,7 +349,7 @@ class OpikTrace(Base):
     
     # Context and metadata
     context_data = Column(JSON, default=dict)
-    metadata = Column(JSON, default=dict)
+    trace_metadata = Column(JSON, default=dict)
     
     # Success tracking
     user_feedback_received = Column(Boolean, default=False)
