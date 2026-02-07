@@ -15,7 +15,7 @@ from sklearn.preprocessing import StandardScaler
 import structlog
 
 from .base_agent import BaseAgent, AgentResponse, AgentContext
-from ..core.config import settings
+from ..core.config import settings, MODEL_CONFIGS
 from ..database.models import OpikTrace, Intervention, User, Goal
 
 logger = structlog.get_logger(__name__)

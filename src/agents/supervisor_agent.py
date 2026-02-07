@@ -10,11 +10,11 @@ from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 import structlog
 
 from .base_agent import BaseAgent, AgentResponse, AgentContext
-from ..core.config import settings
+from ..core.config import settings, MODEL_CONFIGS
 
 
 logger = structlog.get_logger(__name__)

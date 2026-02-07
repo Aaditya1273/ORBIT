@@ -4,9 +4,9 @@ Centralized configuration using Pydantic Settings
 """
 
 import os
-from typing import List, Optional
-from pydantic_settings import BaseSettings
+from typing import List, Optional, Any, Union
 from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 class Settings(BaseSettings):
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
     SECRET_KEY: str = "orbit-dev-secret-key"
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1", "0.0.0.0"]
+    ALLOWED_HOSTS: Union[List[str], str] = ["localhost", "127.0.0.1", "0.0.0.0"]
     
     # Database
     DATABASE_URL: str = "sqlite:///./orbit_dev.db"
@@ -99,9 +99,15 @@ class Settings(BaseSettings):
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
     def parse_allowed_hosts(cls, v):
+        if not v:
+            return ["localhost", "127.0.0.1", "0.0.0.0"]
         if isinstance(v, str):
-            return [host.strip() for host in v.split(",")]
-        elif isinstance(v, list):
+            # Handle standard CSV or bracketed list strings
+            v = v.strip()
+            if v.startswith("[") and v.endswith("]"):
+                v = v[1:-1]
+            return [host.strip() for host in v.split(",") if host.strip()]
+        if isinstance(v, list):
             return v
         return ["localhost", "127.0.0.1", "0.0.0.0"]
     
@@ -119,9 +125,12 @@ class Settings(BaseSettings):
             raise ValueError("LOG_LEVEL must be a valid logging level")
         return v
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=(".env", ".env.local"),
+        env_file_encoding='utf-8',
+        case_sensitive=True,
+        extra='ignore'
+    )
 
 @lru_cache()
 def get_settings() -> Settings:
