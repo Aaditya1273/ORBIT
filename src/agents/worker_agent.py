@@ -9,8 +9,9 @@ from typing import Dict, Any, List, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from .base_agent import BaseAgent, AgentResponse, AgentContext
-from ..core.config import settings, DOMAIN_CONFIGS
-from ..models.intervention import InterventionType
+from ..core.config import settings, DOMAIN_CONFIGS, MODEL_CONFIGS
+from ..behavioral_science.intervention_engine import InterventionType
+from ..api.schemas import InterventionRequest
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -234,7 +235,7 @@ QUALITY STANDARDS:
     
     async def _generate_predictive_intervention(
         self,
-        request: InterventionRequest,
+        request: "InterventionRequest",
         user_patterns: Dict[str, Any],
         context: AgentContext
     ) -> Dict[str, Any]:
@@ -376,7 +377,7 @@ QUALITY STANDARDS:
     
     def _build_predictive_intervention_prompt(
         self,
-        request: InterventionRequest,
+        request: "InterventionRequest",
         user_patterns: Dict[str, Any],
         context: AgentContext,
         failure_risk: float

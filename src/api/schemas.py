@@ -24,8 +24,9 @@ class UserResponse(BaseModel):
     name: str
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
 class DomainType(str, Enum):
@@ -79,8 +80,8 @@ class InterventionFeedback(BaseModel):
     completion_time_minutes: Optional[int] = Field(None, description="Time taken to complete")
     difficulty_rating: Optional[int] = Field(None, ge=1, le=5, description="Difficulty rating 1-5")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "complied": True,
                 "rating": 4,
@@ -89,6 +90,7 @@ class InterventionFeedback(BaseModel):
                 "difficulty_rating": 2
             }
         }
+    }
 
 
 class GoalCreate(BaseModel):
@@ -104,8 +106,8 @@ class GoalCreate(BaseModel):
     current_value: Optional[Union[int, float, str]] = Field(None, description="Current value")
     unit: Optional[str] = Field(None, description="Unit of measurement")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "title": "Exercise 3 times per week",
                 "description": "Build a consistent exercise habit",
@@ -117,6 +119,7 @@ class GoalCreate(BaseModel):
                 "unit": "times per week"
             }
         }
+    }
 
 
 class GoalUpdate(BaseModel):
@@ -140,8 +143,9 @@ class EvaluationResponse(BaseModel):
     overall_score: float = Field(..., ge=0.0, le=1.0)
     feedback: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = {
+        'from_attributes': True
+    }
 
 
 class InterventionResponse(BaseModel):
@@ -155,8 +159,8 @@ class InterventionResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
     execution_time_ms: int = Field(..., description="Execution time in milliseconds")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "intervention_id": "int_1640995200",
                 "content": "Based on your energy patterns, now is a great time to tackle that important project. Start with just 25 minutes of focused work.",
@@ -171,6 +175,7 @@ class InterventionResponse(BaseModel):
                 "execution_time_ms": 1250
             }
         }
+    }
 
 
 class GoalResponse(BaseModel):
@@ -195,8 +200,8 @@ class GoalResponse(BaseModel):
     ai_insights: Optional[List[str]] = Field(default=[], description="AI-generated insights")
     next_actions: Optional[List[str]] = Field(default=[], description="Suggested next actions")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "id": "goal_123",
                 "title": "Exercise 3 times per week",
@@ -215,6 +220,7 @@ class GoalResponse(BaseModel):
                 "next_actions": ["Schedule tomorrow's workout", "Prepare gym clothes tonight"]
             }
         }
+    }
 
 
 class UserPatterns(BaseModel):
@@ -231,8 +237,8 @@ class UserPatterns(BaseModel):
     compliance_patterns: Dict[str, Any] = Field(default={}, description="Compliance patterns")
     energy_patterns: Dict[str, Any] = Field(default={}, description="Energy level patterns")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "user_id": "user_123",
                 "analysis_timestamp": "2024-01-15T10:30:00Z",
@@ -251,6 +257,7 @@ class UserPatterns(BaseModel):
                 ]
             }
         }
+    }
 
 
 class DashboardData(BaseModel):
@@ -263,8 +270,8 @@ class DashboardData(BaseModel):
     goals: List[Dict[str, Any]] = Field(default=[], description="Active goals summary")
     todays_plan: List[Dict[str, Any]] = Field(default=[], description="Today's planned activities")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "user": {
                     "id": "user_123",
@@ -290,6 +297,7 @@ class DashboardData(BaseModel):
                 ]
             }
         }
+    }
 
 
 # Integration Schemas
@@ -307,8 +315,8 @@ class IntegrationStatus(BaseModel):
     last_sync: Optional[datetime] = Field(None, description="Last successful sync")
     error_message: Optional[str] = Field(None, description="Error message if failed")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "integration_type": "google_calendar",
                 "status": "connected",
@@ -316,6 +324,7 @@ class IntegrationStatus(BaseModel):
                 "error_message": None
             }
         }
+    }
 
 
 # Analytics Schemas
@@ -334,8 +343,8 @@ class AnalyticsResponse(BaseModel):
     trends: Dict[str, Any] = Field(default={}, description="Trend analysis")
     insights: List[str] = Field(default=[], description="Key insights")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "period": {
                     "start_date": "2024-01-01T00:00:00Z",
@@ -356,6 +365,7 @@ class AnalyticsResponse(BaseModel):
                 ]
             }
         }
+    }
 
 
 # Error Schemas
@@ -366,8 +376,8 @@ class ErrorResponse(BaseModel):
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Error timestamp")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "error": "ValidationError",
                 "message": "Invalid input data",
@@ -375,6 +385,7 @@ class ErrorResponse(BaseModel):
                 "timestamp": "2024-01-15T10:30:00Z"
             }
         }
+    }
 
 
 # Health Check Schema
@@ -385,8 +396,8 @@ class HealthCheck(BaseModel):
     version: str = Field(..., description="API version")
     agents: Dict[str, Dict[str, Any]] = Field(default={}, description="Agent health status")
     
-    class Config:
-        schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "status": "healthy",
                 "timestamp": 1640995200.0,
@@ -397,3 +408,4 @@ class HealthCheck(BaseModel):
                 }
             }
         }
+    }
