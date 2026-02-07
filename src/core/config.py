@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
     SECRET_KEY: str = "orbit-dev-secret-key"
-    ALLOWED_HOSTS: Union[List[str], str] = ["localhost", "127.0.0.1", "0.0.0.0"]
+    ALLOWED_HOSTS: Any = "localhost,127.0.0.1,0.0.0.0"
     
     # Database
     DATABASE_URL: str = "sqlite:///./orbit_dev.db"
@@ -101,14 +101,13 @@ class Settings(BaseSettings):
     def parse_allowed_hosts(cls, v):
         if not v:
             return ["localhost", "127.0.0.1", "0.0.0.0"]
+        if isinstance(v, list):
+            return v
         if isinstance(v, str):
-            # Handle standard CSV or bracketed list strings
             v = v.strip()
             if v.startswith("[") and v.endswith("]"):
                 v = v[1:-1]
             return [host.strip() for host in v.split(",") if host.strip()]
-        if isinstance(v, list):
-            return v
         return ["localhost", "127.0.0.1", "0.0.0.0"]
     
     @field_validator("ENVIRONMENT")

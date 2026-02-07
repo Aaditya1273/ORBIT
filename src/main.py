@@ -32,7 +32,7 @@ if settings.SENTRY_DSN:
         dsn=settings.SENTRY_DSN,
         # Enable FastAPI integration for automatic request tracking
         integrations=[
-            FastApiIntegration(auto_enabling=True),
+            FastApiIntegration(),
             SqlalchemyIntegration(),
         ],
         # Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring
