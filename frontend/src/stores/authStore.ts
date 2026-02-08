@@ -17,6 +17,7 @@ interface AuthState {
   register: (email: string, name: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => void;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -77,7 +78,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkAuth: () => {
     const token = localStorage.getItem('access_token');
     const userStr = localStorage.getItem('user');
-    
+
     if (token && userStr) {
       try {
         const user = JSON.parse(userStr);
@@ -90,5 +91,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         localStorage.removeItem('user');
       }
     }
+  },
+
+  updateUser: (updates: Partial<User>) => {
+    set((state) => {
+      if (!state.user) return state;
+      const updatedUser = { ...state.user, ...updates };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      return { user: updatedUser };
+    });
   },
 }));

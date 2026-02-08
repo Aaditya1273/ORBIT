@@ -1,230 +1,119 @@
-import React from 'react';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  IconButton,
-  Avatar,
-  Box,
-  Badge,
-  Menu,
-  MenuItem,
-  Divider,
-  ListItemIcon,
-  ListItemText,
-  Switch,
-  FormControlLabel
-} from '@mui/material';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Notifications,
-  Settings,
+  Search,
+  Menu as MenuIcon,
+  Psychology,
   AccountCircle,
-  Logout,
-  DarkMode,
-  LightMode,
-  Psychology
+  Settings,
+  Logout
 } from '@mui/icons-material';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-
+import {
+  Badge,
+  Avatar,
+  Tooltip,
+  IconButton
+} from '@mui/material';
 import { useAuthStore } from '../../stores/authStore';
-import { useThemeStore } from '../../stores/themeStore';
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const { isDarkMode, toggleTheme } = useThemeStore();
-  
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
-
-  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleProfileMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setNotificationAnchor(event.currentTarget);
-  };
-
-  const handleNotificationClose = () => {
-    setNotificationAnchor(null);
-  };
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const handleLogout = () => {
     logout();
-    handleProfileMenuClose();
     navigate('/login');
   };
 
-  const mockNotifications = [
-    { id: 1, title: 'Goal Progress Update', message: 'You\'re 80% towards your fitness goal!', time: '5m ago' },
-    { id: 2, title: 'AI Insight', message: 'New pattern detected in your productivity', time: '1h ago' },
-    { id: 3, title: 'Weekly Summary', message: 'Your weekly report is ready', time: '2h ago' }
-  ];
-
   return (
-    <AppBar 
-      position="sticky" 
-      elevation={1}
-      sx={{ 
-        bgcolor: 'background.paper',
-        color: 'text.primary',
-        borderBottom: '1px solid',
-        borderColor: 'divider'
-      }}
-    >
-      <Toolbar sx={{ justifyContent: 'space-between' }}>
-        {/* Left side - Logo/Title */}
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Psychology sx={{ mr: 1, color: 'primary.main' }} />
-          <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+    <nav className="nav-blur px-6 py-3 flex items-center justify-between">
+      {/* Left Section: Logo & Search */}
+      <div className="flex items-center gap-8">
+        <div
+          className="flex items-center gap-2 cursor-pointer group"
+          onClick={() => navigate('/dashboard')}
+        >
+          <div className="w-10 h-10 rounded-xl bg-gray-950 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <Psychology className="text-2xl" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-gray-900 font-outfit">
             ORBIT
-          </Typography>
-        </Box>
+          </span>
+        </div>
 
-        {/* Right side - Actions */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {/* Theme Toggle */}
-          <IconButton onClick={toggleTheme} color="inherit">
-            {isDarkMode ? <LightMode /> : <DarkMode />}
-          </IconButton>
+        <div className="hidden md:flex items-center relative">
+          <Search className="absolute left-3 text-gray-400 text-sm" />
+          <input
+            type="text"
+            placeholder="Search goals or insights..."
+            className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:bg-white transition-all w-64 font-inter"
+          />
+        </div>
+      </div>
 
-          {/* Notifications */}
-          <IconButton 
-            color="inherit" 
-            onClick={handleNotificationOpen}
-          >
-            <Badge badgeContent={3} color="error">
-              <Notifications />
+      {/* Right Section: Actions */}
+      <div className="flex items-center gap-4">
+        <Tooltip title="Notifications">
+          <IconButton className="text-gray-600 hover:bg-gray-100/50">
+            <Badge badgeContent={3} color="primary" variant="dot">
+              <Notifications className="text-[22px]" />
             </Badge>
           </IconButton>
+        </Tooltip>
 
-          {/* Profile Menu */}
-          <IconButton
-            onClick={handleProfileMenuOpen}
-            sx={{ ml: 1 }}
+        <div className="h-6 w-[1px] bg-gray-200 mx-2" />
+
+        <div className="relative">
+          <button
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="flex items-center gap-3 p-1 rounded-full hover:bg-gray-100 transition-colors"
           >
-            <Avatar 
-              sx={{ 
-                width: 32, 
-                height: 32,
-                bgcolor: 'primary.main'
-              }}
+            <div className="flex flex-col items-end hidden sm:flex">
+              <span className="text-xs font-semibold text-gray-900">{user?.name || 'User'}</span>
+              <span className="text-[10px] text-gray-500 font-medium">Pro Plan</span>
+            </div>
+            <Avatar
+              className="w-9 h-9 border border-gray-200 shadow-sm"
+              sx={{ bgcolor: 'white', color: 'black' }}
             >
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
+              {user?.name?.charAt(0) || 'U'}
             </Avatar>
-          </IconButton>
-        </Box>
+          </button>
 
-        {/* Profile Menu */}
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleProfileMenuClose}
-          onClick={handleProfileMenuClose}
-          PaperProps={{
-            elevation: 3,
-            sx: {
-              mt: 1.5,
-              minWidth: 200,
-              '& .MuiAvatar-root': {
-                width: 32,
-                height: 32,
-                ml: -0.5,
-                mr: 1,
-              },
-            },
-          }}
-          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        >
-          <MenuItem>
-            <Avatar sx={{ bgcolor: 'primary.main' }}>
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
-            </Avatar>
-            <Box>
-              <Typography variant="subtitle2">{user?.name || 'User'}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                {user?.email || 'user@orbit.ai'}
-              </Typography>
-            </Box>
-          </MenuItem>
-          
-          <Divider />
-          
-          <MenuItem onClick={() => navigate('/settings')}>
-            <ListItemIcon>
-              <Settings fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Settings</ListItemText>
-          </MenuItem>
-          
-          <MenuItem>
-            <ListItemIcon>
-              <AccountCircle fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Profile</ListItemText>
-          </MenuItem>
-          
-          <Divider />
-          
-          <MenuItem onClick={handleLogout}>
-            <ListItemIcon>
-              <Logout fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Logout</ListItemText>
-          </MenuItem>
-        </Menu>
-
-        {/* Notifications Menu */}
-        <Menu
-          anchorEl={notificationAnchor}
-          open={Boolean(notificationAnchor)}
-          onClose={handleNotificationClose}
-          PaperProps={{
-            elevation: 3,
-            sx: {
-              mt: 1.5,
-              maxWidth: 350,
-              minWidth: 300,
-            },
-          }}
-          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-        >
-          <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="h6">Notifications</Typography>
-          </Box>
-          
-          {mockNotifications.map((notification) => (
-            <MenuItem key={notification.id} onClick={handleNotificationClose}>
-              <Box sx={{ width: '100%' }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  {notification.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  {notification.message}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {notification.time}
-                </Typography>
-              </Box>
-            </MenuItem>
-          ))}
-          
-          <Divider />
-          <MenuItem onClick={handleNotificationClose}>
-            <Typography variant="body2" color="primary" sx={{ width: '100%', textAlign: 'center' }}>
-              View All Notifications
-            </Typography>
-          </MenuItem>
-        </Menu>
-      </Toolbar>
-    </AppBar>
+          {showProfileMenu && (
+            <div className="absolute right-0 mt-3 w-56 glass-card rounded-2xl py-2 z-[100] animate-in fade-in zoom-in duration-200 origin-top-right">
+              <div className="px-4 py-2 mb-2">
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Account</p>
+              </div>
+              <button
+                onClick={() => navigate('/settings')}
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <Settings className="text-lg text-gray-400" />
+                <span>Settings</span>
+              </button>
+              <button
+                onClick={() => navigate('/settings')}
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <AccountCircle className="text-lg text-gray-400" />
+                <span>My Profile</span>
+              </button>
+              <div className="h-[1px] bg-gray-100 my-2 mx-2" />
+              <button
+                onClick={handleLogout}
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <Logout className="text-lg" />
+                <span>Logout</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </nav>
   );
 };
 

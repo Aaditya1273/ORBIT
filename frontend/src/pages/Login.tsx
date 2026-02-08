@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Psychology, FlashOn, ArrowForward, MailOutline, LockOutlined, PersonOutline } from '@mui/icons-material';
 import { useAuthStore } from '../stores/authStore';
 
 function Login() {
@@ -21,20 +23,18 @@ function Login() {
 
     try {
       if (isRegister) {
-        // Register
         const response = await fetch('http://localhost:8000/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
-        
+
         if (!response.ok) {
           const data = await response.json();
           throw new Error(data.detail || 'Registration failed');
         }
       }
 
-      // Login
       const response = await fetch('http://localhost:8000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -60,118 +60,165 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500 p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-purple-600 mb-2">🎯 ORBIT</h1>
-          <p className="text-gray-600">AI-Powered Life Optimization</p>
-        </div>
+    <div className="min-h-screen bg-slate-950 flex relative overflow-hidden font-inter">
+      {/* Background Decorative Elements */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-white/5 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/5 rounded-full blur-[120px]" />
+      </div>
 
-        {/* Toggle */}
-        <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setIsRegister(false)}
-            className={`flex-1 py-2 rounded-md transition ${
-              !isRegister ? 'bg-white shadow' : 'text-gray-600'
-            }`}
-          >
-            Login
-          </button>
-          <button
-            onClick={() => setIsRegister(true)}
-            className={`flex-1 py-2 rounded-md transition ${
-              isRegister ? 'bg-white shadow' : 'text-gray-600'
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
+      {/* Left side: Branding/Visual */}
+      <div className="hidden lg:flex lg:w-1/2 p-24 flex-col justify-between relative z-10 border-r border-white/5">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-3"
+        >
+          <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-950 shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+            <Psychology className="text-3xl" />
           </div>
-        )}
+          <span className="text-2xl font-bold tracking-tight text-white font-outfit uppercase">ORBIT</span>
+        </motion.div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isRegister && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name
-              </label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required={isRegister}
-              />
+        <div className="space-y-6">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-7xl font-bold text-white font-outfit leading-tight tracking-tighter"
+          >
+            Optimize Your <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-white/40 italic">Human Potential</span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="text-xl text-gray-400 max-w-md font-light leading-relaxed"
+          >
+            Orbit is a sophisticated intelligence layer designed to refine behavioral patterns and maximize cognitive output through AI-driven interventions.
+          </motion.p>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          className="flex items-center gap-8"
+        >
+          <div className="flex flex-col">
+            <span className="text-2xl font-bold text-white font-outfit">18.4k</span>
+            <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Active Nodes</span>
+          </div>
+          <div className="h-8 w-[1px] bg-white/10" />
+          <div className="flex flex-col">
+            <span className="text-2xl font-bold text-white font-outfit">99.9%</span>
+            <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Uptime</span>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Right side: Auth Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-md bg-white/[0.03] backdrop-blur-3xl border border-white/10 rounded-[48px] p-12 shadow-2xl"
+        >
+          <div className="mb-10">
+            <h2 className="text-3xl font-bold text-white font-outfit mb-3">
+              {isRegister ? 'Initialize Account' : 'Satellite Uplink'}
+            </h2>
+            <p className="text-gray-500 text-sm">
+              {isRegister ? 'Join the next generation of life optimization.' : 'Welcome back, Commander. Enter your credentials.'}
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <AnimatePresence mode="wait">
+              {isRegister && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-2"
+                >
+                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] ml-1">Identity Name</label>
+                  <div className="relative group">
+                    <PersonOutline className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors" />
+                    <input
+                      type="text"
+                      placeholder="e.g. John Doe"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-gray-600 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all font-inter text-sm"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required={isRegister}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] ml-1">Network UID</label>
+              <div className="relative group">
+                <MailOutline className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors" />
+                <input
+                  type="email"
+                  placeholder="name@company.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-gray-600 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all font-inter text-sm"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
+                />
+              </div>
             </div>
-          )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              required
-            />
-          </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] ml-1">Security Key</label>
+              <div className="relative group">
+                <LockOutlined className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-white transition-colors" />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-gray-600 focus:outline-none focus:border-white/30 focus:bg-white/10 transition-all font-inter text-sm"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  required
+                  minLength={8}
+                />
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              required
-              minLength={8}
-            />
-          </div>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-2xl line-clamp-2"
+              >
+                {error}
+              </motion.div>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition disabled:opacity-50"
-          >
-            {loading ? 'Processing...' : isRegister ? 'Create Account' : 'Login'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-white text-slate-950 py-4 rounded-2xl font-bold hover:bg-white/90 transition-all shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 group disabled:opacity-50"
+            >
+              <span>{loading ? 'Processing...' : isRegister ? 'Initialize Connection' : 'Establish Link'}</span>
+              {!loading && <ArrowForward className="group-hover:translate-x-1 transition-transform" />}
+            </button>
+          </form>
 
-        {/* Features */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-sm text-gray-600 text-center mb-4">
-            Why ORBIT?
+          <p className="mt-8 text-center text-sm text-gray-500">
+            {isRegister ? 'Already registered?' : "Need an identity?"}{' '}
+            <button
+              onClick={() => setIsRegister(!isRegister)}
+              className="text-white font-semibold hover:underline"
+            >
+              {isRegister ? 'Establish Link' : 'Initialize Account'}
+            </button>
           </p>
-          <div className="grid grid-cols-2 gap-3 text-xs text-gray-600">
-            <div className="flex items-center">
-              <span className="mr-2">🤖</span>
-              <span>AI-Powered</span>
-            </div>
-            <div className="flex items-center">
-              <span className="mr-2">📊</span>
-              <span>Real-time Analytics</span>
-            </div>
-            <div className="flex items-center">
-              <span className="mr-2">🎯</span>
-              <span>Goal Tracking</span>
-            </div>
-            <div className="flex items-center">
-              <span className="mr-2">🔒</span>
-              <span>Secure & Private</span>
-            </div>
-          </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

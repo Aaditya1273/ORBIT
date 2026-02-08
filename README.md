@@ -79,7 +79,7 @@ Your goals don't exist in isolation:
 
 ---
 
-## 🏗️ Technical Architecture
+## 🏗️ Technical Architecture.
 
 ```mermaid
 graph TB

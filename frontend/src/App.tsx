@@ -12,14 +12,14 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white">
         <Routes>
           {/* Public routes */}
-          <Route 
-            path="/login" 
-            element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} 
+          <Route
+            path="/login"
+            element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />}
           />
-          
+
           {/* Protected routes */}
           <Route
             path="/dashboard"
@@ -37,11 +37,11 @@ function App() {
             path="/settings"
             element={isAuthenticated ? <Settings /> : <Navigate to="/login" />}
           />
-          
+
           {/* Default redirect */}
-          <Route 
-            path="/" 
-            element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} 
+          <Route
+            path="/"
+            element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />}
           />
         </Routes>
       </div>
