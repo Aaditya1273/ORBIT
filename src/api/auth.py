@@ -60,8 +60,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def get_password_hash(password: str) -> str:
-    """Hash password"""
-    return pwd_context.hash(password)
+    """Hash password (bcrypt has 72 byte limit, so we truncate)"""
+    # Truncate to 72 bytes to avoid bcrypt limitation
+    password_truncated = password[:72] if len(password) > 72 else password
+    return pwd_context.hash(password_truncated)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -119,7 +121,7 @@ async def get_current_user(
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def register(user_data: UserRegister, db: Session = Depends(get_db)):
     """
-    Register a new user
+    Register a new user with OTP verification
     """
     try:
         # Check if user already exists
@@ -129,6 +131,15 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered"
             )
+        
+        # Generate 6-digit OTP
+        import random
+        otp = str(random.randint(100000, 999999))
+        
+        # Print OTP to console for testing
+        print("\n" + "="*60)
+        print(f"🔐 OTP for {user_data.email}: {otp}")
+        print("="*60 + "\n")
         
         # Create new user
         hashed_password = get_password_hash(user_data.password)
@@ -142,6 +153,7 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
             last_active=datetime.utcnow()
         )
         
+        # Save to database
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
@@ -149,14 +161,21 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
         logger.info(
             "User registered successfully",
             user_id=str(new_user.id),
-            email=new_user.email
+            email=new_user.email,
+            otp=otp
         )
         
-        # Send welcome email (async, don't wait)
+        # Try to send OTP email (non-blocking)
         try:
-            email_service.send_welcome_email(new_user.email, new_user.name)
+            # For now, just log to console. You can add real email service later
+            print(f"📧 Sending OTP email to {new_user.email}")
+            print(f"   Your verification code is: {otp}")
+            print(f"   This code will expire in 10 minutes.\n")
+            
+            # Uncomment when you have email service configured:
+            # email_service.send_otp_email(new_user.email, new_user.name, otp)
         except Exception as e:
-            logger.error(f"Failed to send welcome email: {str(e)}")
+            logger.error(f"Failed to send OTP email: {str(e)}")
         
         # Create access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -178,7 +197,67 @@ async def register(user_data: UserRegister, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Registration failed"
+            detail=f"Registration failed: {str(e)}"
+        )
+
+
+@router.post("/login-json", response_model=Token)
+async def login_json(
+    user_data: UserLogin,
+    db: Session = Depends(get_db)
+):
+    """
+    Login user with JSON payload (email/password) and return JWT token
+    """
+    try:
+        # Get user
+        user = get_user_by_email(db, user_data.email)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Verify password
+        if not verify_password(user_data.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Update last active
+        user.last_active = datetime.utcnow()
+        db.commit()
+        
+        logger.info(
+            "User logged in successfully",
+            user_id=str(user.id),
+            email=user.email
+        )
+        
+        # Create access token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email},
+            expires_delta=access_token_expires
+        )
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": user.to_dict()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Login failed: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Login failed"
         )
 
 

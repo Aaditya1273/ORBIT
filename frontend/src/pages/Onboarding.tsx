@@ -12,7 +12,7 @@ import {
   RocketLaunch
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 
@@ -25,7 +25,7 @@ const domains = [
 ];
 
 const Onboarding: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const { updateUser } = useAuthStore();
   const [activeStep, setActiveStep] = useState(0);
   const [selectedDomains, setSelectedDomains] = useState<string[]>([]);
@@ -48,7 +48,7 @@ const Onboarding: React.FC = () => {
   const handleComplete = () => {
     updateUser({ onboarding_completed: true });
     toast.success('System link established. Welcome to ORBIT.');
-    navigate('/dashboard');
+    router.push('/dashboard');
   };
 
   const toggleDomain = (domainId: string) => {

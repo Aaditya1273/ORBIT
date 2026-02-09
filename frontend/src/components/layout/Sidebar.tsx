@@ -10,11 +10,11 @@ import {
   ChevronRight,
   FiberManualRecord
 } from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useRouter, useLocation } from 'next/navigation';
 import { Tooltip } from '@mui/material';
 
 const Sidebar: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = React.useState(false);
 
@@ -57,7 +57,7 @@ const Sidebar: React.FC = () => {
         {mainMenuItems.map((item) => (
           <button
             key={item.text}
-            onClick={() => navigate(item.path)}
+            onClick={() => router.push(item.path)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group relative ${isActive(item.path)
               ? 'bg-gray-950 text-white shadow-lg shadow-gray-200'
               : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'

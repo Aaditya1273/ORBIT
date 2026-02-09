@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import {
   Notifications,
   Search,
@@ -18,13 +18,13 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 
 const Navbar: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const { user, logout } = useAuthStore();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    router.push('/login');
   };
 
   return (
@@ -33,7 +33,7 @@ const Navbar: React.FC = () => {
       <div className="flex items-center gap-8">
         <div
           className="flex items-center gap-2 cursor-pointer group"
-          onClick={() => navigate('/dashboard')}
+          onClick={() => router.push('/dashboard')}
         >
           <div className="w-10 h-10 rounded-xl bg-gray-950 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
             <Psychology className="text-2xl" />
@@ -88,14 +88,14 @@ const Navbar: React.FC = () => {
                 <p className="text-xs text-gray-400 font-semibold uppercase tracking-wider">Account</p>
               </div>
               <button
-                onClick={() => navigate('/settings')}
+                onClick={() => router.push('/settings')}
                 className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <Settings className="text-lg text-gray-400" />
                 <span>Settings</span>
               </button>
               <button
-                onClick={() => navigate('/settings')}
+                onClick={() => router.push('/settings')}
                 className="w-full px-4 py-2.5 flex items-center gap-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 <AccountCircle className="text-lg text-gray-400" />

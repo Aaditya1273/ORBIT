@@ -1,13 +1,21 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Psychology, FlashOn, ArrowForward, MailOutline, LockOutlined, PersonOutline } from '@mui/icons-material';
+import { Psychology, ArrowForward, MailOutline, LockOutlined, PersonOutline } from '@mui/icons-material';
 import { useAuthStore } from '../stores/authStore';
+import toast from 'react-hot-toast';
 
 function Login() {
-  const navigate = useNavigate();
-  const { login } = useAuthStore();
-  const [isRegister, setIsRegister] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login: loginUser } = useAuthStore();
+
+  // Check URL param for mode (login or signup)
+  const urlMode = searchParams.get('mode');
+  const [isRegister, setIsRegister] = useState(urlMode === 'signup');
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -16,6 +24,11 @@ function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Update isRegister when URL changes
+  useEffect(() => {
+    setIsRegister(urlMode === 'signup');
+  }, [urlMode]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -23,19 +36,27 @@ function Login() {
 
     try {
       if (isRegister) {
-        const response = await fetch('http://localhost:8000/api/auth/register', {
+        // Register new user
+        const registerResponse = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            name: formData.name
+          })
         });
 
-        if (!response.ok) {
-          const data = await response.json();
+        if (!registerResponse.ok) {
+          const data = await registerResponse.json();
           throw new Error(data.detail || 'Registration failed');
         }
+
+        toast.success('Account created! Logging you in...');
       }
 
-      const response = await fetch('http://localhost:8000/api/auth/login', {
+      // Login (for both new users and existing users)
+      const loginResponse = await fetch('/api/auth/login-json', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -44,16 +65,25 @@ function Login() {
         })
       });
 
-      if (!response.ok) {
-        const data = await response.json();
+      if (!loginResponse.ok) {
+        const data = await loginResponse.json();
         throw new Error(data.detail || 'Login failed');
       }
 
-      const data = await response.json();
-      login(data.access_token, data.user);
-      navigate('/dashboard');
+      const data = await loginResponse.json();
+      loginUser(data.access_token, data.user);
+
+      toast.success('Welcome to ORBIT!');
+
+      // Redirect based on onboarding status
+      if (data.user.onboarding_completed) {
+        router.push('/dashboard');
+      } else {
+        router.push('/onboarding');
+      }
     } catch (err: any) {
       setError(err.message);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }

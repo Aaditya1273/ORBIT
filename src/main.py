@@ -18,6 +18,7 @@ from src.core.config import settings
 from src.database.database import init_db
 from src.core.redis import init_redis, health_check_redis
 from src.api.main import app as api_app
+from src.api.auth import router as auth_router
 
 # Configure logging
 logging.basicConfig(
@@ -192,7 +193,7 @@ async def trigger_sentry_error():
 
 # Include API routes
 from src.api.auth import router as auth_router
-app.include_router(auth_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api")
 app.include_router(api_app, prefix="/api/v1")
 
 # Root endpoint

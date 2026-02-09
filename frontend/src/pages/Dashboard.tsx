@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Psychology,
@@ -34,7 +34,7 @@ const StatCard = ({ title, value, icon, color, delay }: { title: string, value: 
 );
 
 function Dashboard() {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const { user } = useAuthStore();
 
   const containerVariants = {
@@ -75,7 +75,7 @@ function Dashboard() {
             </p>
           </div>
           <button
-            onClick={() => navigate('/goals')}
+            onClick={() => router.push('/goals')}
             className="btn-premium gap-2 group shadow-xl shadow-gray-200"
           >
             <Add className="text-lg" />
